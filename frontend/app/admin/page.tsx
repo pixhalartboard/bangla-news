@@ -1,22 +1,41 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+
+type NewsItem = {
+  id: number;
+  title: string;
+  category: string;
+  description: string;
+  image: string | null;
+  published_at: string;
+  breaking: boolean;
+};
 
 export default function AdminDashboard() {
   const [activeMenu, setActiveMenu] = useState("Dashboard");
 
-  // Add News form state
+  // ================= ADD NEWS FORM =================
+
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("দেশের কথা");
   const [description, setDescription] = useState("");
   const [breaking, setBreaking] = useState(false);
   const [image, setImage] = useState<File | null>(null);
 
-  // Success / error state
+  // ================= NEWS DATA =================
+
+  const [newsList, setNewsList] = useState<NewsItem[]>([]);
+  const [isLoadingNews, setIsLoadingNews] = useState(false);
+
+  // ================= SUCCESS / ERROR =================
+
   const [showSuccess, setShowSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isPublishing, setIsPublishing] = useState(false);
+
+  // ================= MENU =================
 
   const menuItems = [
     "Dashboard",
@@ -27,7 +46,34 @@ export default function AdminDashboard() {
     "Settings",
   ];
 
+  // ================= LOAD NEWS =================
+
+  const loadNews = async () => {
+    setIsLoadingNews(true);
+
+    const { data, error } = await supabase
+      .from("news")
+      .select("*")
+      .order("published_at", { ascending: false });
+
+    if (error) {
+      console.error("News Load Error:", error);
+      setErrorMessage(error.message);
+    } else {
+      setNewsList((data as NewsItem[]) || []);
+    }
+
+    setIsLoadingNews(false);
+  };
+
+  // ================= LOAD NEWS ON PAGE OPEN =================
+
+  useEffect(() => {
+    loadNews();
+  }, []);
+
   // ================= PUBLISH NEWS =================
+
   const handlePublish = async () => {
     setErrorMessage("");
 
@@ -60,16 +106,22 @@ export default function AdminDashboard() {
         return;
       }
 
+      // নতুন News আবার load
+      await loadNews();
+
       setShowSuccess(true);
+
     } catch (error) {
       console.error("Unexpected Error:", error);
       setErrorMessage("News publish করার সময় একটি সমস্যা হয়েছে।");
+
     } finally {
       setIsPublishing(false);
     }
   };
 
   // ================= RESET FORM =================
+
   const resetForm = () => {
     setShowSuccess(false);
     setTitle("");
@@ -80,12 +132,30 @@ export default function AdminDashboard() {
     setErrorMessage("");
   };
 
+  // ================= COUNTS =================
+
+  const totalNews = newsList.length;
+
+  const breakingNewsCount = newsList.filter(
+    (item) => item.breaking === true
+  ).length;
+
+  const categoryCount = 7;
+
+  const mediaCount = newsList.filter(
+    (item) => item.image
+  ).length;
+
+  // ================= UI =================
+
   return (
     <main className="min-h-screen bg-gray-100 text-black">
 
       {/* ================= SUCCESS SCREEN ================= */}
+
       {showSuccess && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+
           <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-2xl">
 
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-green-100 text-4xl font-bold text-green-600">
@@ -101,6 +171,7 @@ export default function AdminDashboard() {
             </p>
 
             <div className="mt-5 rounded-lg bg-gray-50 p-4 text-left">
+
               <p className="text-xs font-semibold text-gray-500">
                 NEWS TITLE
               </p>
@@ -116,6 +187,7 @@ export default function AdminDashboard() {
               <p className="mt-1 text-sm">
                 {category}
               </p>
+
             </div>
 
             <button
@@ -126,13 +198,16 @@ export default function AdminDashboard() {
             </button>
 
           </div>
+
         </div>
       )}
 
       {/* ================= SIDEBAR ================= */}
+
       <aside className="fixed left-0 top-0 hidden h-screen w-64 border-r border-gray-200 bg-black text-white md:block">
 
         <div className="border-b border-gray-800 px-6 py-6">
+
           <h1 className="text-2xl font-extrabold">
             বাংলার সংবাদ
           </h1>
@@ -140,10 +215,13 @@ export default function AdminDashboard() {
           <p className="mt-1 text-xs text-gray-400">
             Admin Panel
           </p>
+
         </div>
 
         <nav className="p-4">
+
           {menuItems.map((item) => (
+
             <button
               key={item}
               onClick={() => setActiveMenu(item)}
@@ -155,10 +233,13 @@ export default function AdminDashboard() {
             >
               {item}
             </button>
+
           ))}
+
         </nav>
 
         <div className="absolute bottom-0 left-0 right-0 border-t border-gray-800 p-4">
+
           <button
             onClick={() => {
               window.location.href = "/";
@@ -167,18 +248,23 @@ export default function AdminDashboard() {
           >
             ← Website
           </button>
+
         </div>
 
       </aside>
 
       {/* ================= MAIN AREA ================= */}
+
       <div className="md:ml-64">
 
         {/* ================= TOP BAR ================= */}
+
         <header className="sticky top-0 z-10 border-b border-gray-200 bg-white">
+
           <div className="flex items-center justify-between px-4 py-4 md:px-8">
 
             <div>
+
               <h2 className="text-xl font-bold md:text-2xl">
                 {activeMenu}
               </h2>
@@ -186,11 +272,13 @@ export default function AdminDashboard() {
               <p className="text-xs text-gray-500">
                 বাংলার সংবাদ Admin Panel
               </p>
+
             </div>
 
             <div className="flex items-center gap-3">
 
               <div className="hidden text-right sm:block">
+
                 <p className="text-sm font-bold">
                   Admin
                 </p>
@@ -198,6 +286,7 @@ export default function AdminDashboard() {
                 <p className="text-xs text-gray-500">
                   Administrator
                 </p>
+
               </div>
 
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-black text-sm font-bold text-white">
@@ -205,60 +294,90 @@ export default function AdminDashboard() {
               </div>
 
             </div>
+
           </div>
+
         </header>
 
         {/* ================= CONTENT ================= */}
+
         <div className="p-4 md:p-8">
 
-          {/* ================= DASHBOARD ================= */}
+          {/* ================================================== */}
+          {/* DASHBOARD */}
+          {/* ================================================== */}
+
           {activeMenu === "Dashboard" && (
             <>
+
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 
+                {/* TOTAL NEWS */}
+
                 <div className="rounded-xl border border-gray-200 bg-white p-5">
+
                   <p className="text-sm text-gray-500">
                     Total News
                   </p>
 
                   <h3 className="mt-2 text-3xl font-extrabold">
-                    3
+                    {totalNews}
                   </h3>
+
                 </div>
 
+
+                {/* CATEGORIES */}
+
                 <div className="rounded-xl border border-gray-200 bg-white p-5">
+
                   <p className="text-sm text-gray-500">
                     Categories
                   </p>
 
                   <h3 className="mt-2 text-3xl font-extrabold">
-                    7
+                    {categoryCount}
                   </h3>
+
                 </div>
 
+
+                {/* BREAKING NEWS */}
+
                 <div className="rounded-xl border border-gray-200 bg-white p-5">
+
                   <p className="text-sm text-gray-500">
                     Breaking News
                   </p>
 
                   <h3 className="mt-2 text-3xl font-extrabold">
-                    1
+                    {breakingNewsCount}
                   </h3>
+
                 </div>
 
+
+                {/* MEDIA */}
+
                 <div className="rounded-xl border border-gray-200 bg-white p-5">
+
                   <p className="text-sm text-gray-500">
                     Media
                   </p>
 
                   <h3 className="mt-2 text-3xl font-extrabold">
-                    1
+                    {mediaCount}
                   </h3>
+
                 </div>
 
               </div>
 
+
+              {/* QUICK ACTIONS */}
+
               <section className="mt-8">
+
                 <h3 className="text-xl font-bold">
                   Quick Actions
                 </h3>
@@ -269,7 +388,10 @@ export default function AdminDashboard() {
                     onClick={() => setActiveMenu("Add News")}
                     className="rounded-xl border border-gray-200 bg-white p-6 text-left transition hover:-translate-y-1 hover:shadow-lg"
                   >
-                    <p className="text-2xl">📰</p>
+
+                    <p className="text-2xl">
+                      📰
+                    </p>
 
                     <h4 className="mt-3 font-bold">
                       Add New News
@@ -278,13 +400,18 @@ export default function AdminDashboard() {
                     <p className="mt-1 text-sm text-gray-500">
                       নতুন খবর প্রকাশ করুন
                     </p>
+
                   </button>
+
 
                   <button
                     onClick={() => setActiveMenu("Media")}
                     className="rounded-xl border border-gray-200 bg-white p-6 text-left transition hover:-translate-y-1 hover:shadow-lg"
                   >
-                    <p className="text-2xl">🖼️</p>
+
+                    <p className="text-2xl">
+                      🖼️
+                    </p>
 
                     <h4 className="mt-3 font-bold">
                       Media Library
@@ -293,13 +420,18 @@ export default function AdminDashboard() {
                     <p className="mt-1 text-sm text-gray-500">
                       ছবি ও media manage করুন
                     </p>
+
                   </button>
+
 
                   <button
                     onClick={() => setActiveMenu("Settings")}
                     className="rounded-xl border border-gray-200 bg-white p-6 text-left transition hover:-translate-y-1 hover:shadow-lg"
                   >
-                    <p className="text-2xl">⚙️</p>
+
+                    <p className="text-2xl">
+                      ⚙️
+                    </p>
 
                     <h4 className="mt-3 font-bold">
                       Website Settings
@@ -308,22 +440,44 @@ export default function AdminDashboard() {
                     <p className="mt-1 text-sm text-gray-500">
                       Logo ও website settings
                     </p>
+
                   </button>
 
                 </div>
+
               </section>
 
+
+              {/* RECENT NEWS */}
+
               <section className="mt-8">
-                <h3 className="text-xl font-bold">
-                  Recent News
-                </h3>
+
+                <div className="flex items-center justify-between">
+
+                  <h3 className="text-xl font-bold">
+                    Recent News
+                  </h3>
+
+                  <button
+                    onClick={() => setActiveMenu("News")}
+                    className="text-sm font-bold text-red-600 hover:text-red-700"
+                  >
+                    সব দেখুন →
+                  </button>
+
+                </div>
+
 
                 <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white">
+
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[600px] text-left">
+
+                    <table className="w-full min-w-[700px] text-left">
 
                       <thead className="border-b bg-gray-50 text-sm">
+
                         <tr>
+
                           <th className="px-5 py-4">
                             Title
                           </th>
@@ -339,66 +493,104 @@ export default function AdminDashboard() {
                           <th className="px-5 py-4">
                             Time
                           </th>
+
                         </tr>
+
                       </thead>
+
 
                       <tbody>
 
-                        <tr className="border-b">
-                          <td className="px-5 py-4 font-semibold">
-                            বাংলার গুরুত্বপূর্ণ খবর ও দিনের প্রধান সংবাদ
-                          </td>
+                        {newsList.length === 0 ? (
 
-                          <td className="px-5 py-4 text-sm">
-                            দেশের কথা
-                          </td>
+                          <tr>
 
-                          <td className="px-5 py-4">
-                            <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-700">
-                              Published
-                            </span>
-                          </td>
+                            <td
+                              colSpan={4}
+                              className="px-5 py-10 text-center text-gray-500"
+                            >
+                              এখনও কোনও News নেই।
+                            </td>
 
-                          <td className="px-5 py-4 text-sm text-gray-500">
-                            ১০ মিনিট আগে
-                          </td>
-                        </tr>
+                          </tr>
 
-                        <tr className="border-b">
-                          <td className="px-5 py-4 font-semibold">
-                            বাংলার নতুন খবর ও আপডেট
-                          </td>
+                        ) : (
 
-                          <td className="px-5 py-4 text-sm">
-                            দেশের কথা
-                          </td>
+                          newsList.slice(0, 5).map((item) => (
 
-                          <td className="px-5 py-4">
-                            <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-700">
-                              Published
-                            </span>
-                          </td>
+                            <tr
+                              key={item.id}
+                              className="border-b last:border-b-0"
+                            >
 
-                          <td className="px-5 py-4 text-sm text-gray-500">
-                            ২৫ মিনিট আগে
-                          </td>
-                        </tr>
+                              <td className="px-5 py-4 font-semibold">
+                                {item.title}
+                              </td>
+
+                              <td className="px-5 py-4 text-sm">
+                                {item.category}
+                              </td>
+
+                              <td className="px-5 py-4">
+
+                                {item.breaking ? (
+
+                                  <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-700">
+                                    Breaking
+                                  </span>
+
+                                ) : (
+
+                                  <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-700">
+                                    Published
+                                  </span>
+
+                                )}
+
+                              </td>
+
+                              <td className="px-5 py-4 text-sm text-gray-500">
+
+                                {item.published_at
+                                  ? new Date(
+                                      item.published_at
+                                    ).toLocaleDateString("bn-BD")
+                                  : "-"
+                                }
+
+                              </td>
+
+                            </tr>
+
+                          ))
+
+                        )}
 
                       </tbody>
+
                     </table>
+
                   </div>
+
                 </div>
+
               </section>
+
             </>
           )}
 
-          {/* ================= NEWS ================= */}
+
+          {/* ================================================== */}
+          {/* NEWS */}
+          {/* ================================================== */}
+
           {activeMenu === "News" && (
             <section>
 
               <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
 
                 <div>
+
                   <h3 className="text-2xl font-bold">
                     All News
                   </h3>
@@ -406,7 +598,9 @@ export default function AdminDashboard() {
                   <p className="mt-1 text-sm text-gray-500">
                     আপনার website-এর সব খবর এখানে থাকবে।
                   </p>
+
                 </div>
+
 
                 <button
                   onClick={() => setActiveMenu("Add News")}
@@ -417,13 +611,17 @@ export default function AdminDashboard() {
 
               </div>
 
+
               <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white">
+
                 <div className="overflow-x-auto">
 
-                  <table className="w-full min-w-[700px]">
+                  <table className="w-full min-w-[900px]">
 
                     <thead className="border-b bg-gray-50 text-left text-sm">
+
                       <tr>
+
                         <th className="px-5 py-4">
                           News
                         </th>
@@ -433,64 +631,181 @@ export default function AdminDashboard() {
                         </th>
 
                         <th className="px-5 py-4">
-                          Status
+                          Breaking
+                        </th>
+
+                        <th className="px-5 py-4">
+                          Date
                         </th>
 
                         <th className="px-5 py-4">
                           Action
                         </th>
+
                       </tr>
+
                     </thead>
+
 
                     <tbody>
 
-                      {[
-                        "বাংলার গুরুত্বপূর্ণ খবর ও দিনের প্রধান সংবাদ",
-                        "বাংলার নতুন খবর ও আপডেট",
-                        "দেশের বিভিন্ন প্রান্তের খবর",
-                      ].map((newsTitle, index) => (
-                        <tr
-                          key={index}
-                          className="border-b last:border-0"
-                        >
+                      {isLoadingNews ? (
 
-                          <td className="px-5 py-4 font-semibold">
-                            {newsTitle}
-                          </td>
+                        <tr>
 
-                          <td className="px-5 py-4 text-sm">
-                            দেশের কথা
-                          </td>
-
-                          <td className="px-5 py-4">
-                            <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-700">
-                              Published
-                            </span>
-                          </td>
-
-                          <td className="px-5 py-4">
-                            <button className="mr-2 rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-gray-100">
-                              Edit
-                            </button>
-
-                            <button className="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50">
-                              Delete
-                            </button>
+                          <td
+                            colSpan={5}
+                            className="px-5 py-10 text-center text-gray-500"
+                          >
+                            News loading হচ্ছে...
                           </td>
 
                         </tr>
-                      ))}
+
+                      ) : newsList.length === 0 ? (
+
+                        <tr>
+
+                          <td
+                            colSpan={5}
+                            className="px-5 py-10 text-center text-gray-500"
+                          >
+                            এখনও কোনও News নেই।
+                          </td>
+
+                        </tr>
+
+                      ) : (
+
+                        newsList.map((item) => (
+
+                          <tr
+                            key={item.id}
+                            className="border-b last:border-0"
+                          >
+
+                            {/* NEWS */}
+
+                            <td className="max-w-md px-5 py-4">
+
+                              <p className="font-semibold">
+                                {item.title}
+                              </p>
+
+                              <p className="mt-1 line-clamp-2 text-xs text-gray-500">
+                                {item.description}
+                              </p>
+
+                            </td>
+
+
+                            {/* CATEGORY */}
+
+                            <td className="px-5 py-4 text-sm">
+                              {item.category}
+                            </td>
+
+
+                            {/* BREAKING */}
+
+                            <td className="px-5 py-4">
+
+                              {item.breaking ? (
+
+                                <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-700">
+                                  Breaking
+                                </span>
+
+                              ) : (
+
+                                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-bold text-gray-600">
+                                  Normal
+                                </span>
+
+                              )}
+
+                            </td>
+
+
+                            {/* DATE */}
+
+                            <td className="px-5 py-4 text-sm text-gray-500">
+
+                              {item.published_at
+                                ? new Date(
+                                    item.published_at
+                                  ).toLocaleDateString("bn-BD")
+                                : "-"
+                              }
+
+                            </td>
+
+
+                            {/* ACTION */}
+
+                            <td className="px-5 py-4">
+
+                              <div className="flex gap-2">
+
+                                <a
+                                  href={`/news/${item.id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-gray-100"
+                                >
+                                  View
+                                </a>
+
+
+                                <button
+                                  onClick={() => {
+                                    alert(
+                                      "Edit feature পরের ধাপে যোগ করা হবে।"
+                                    );
+                                  }}
+                                  className="rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-gray-100"
+                                >
+                                  Edit
+                                </button>
+
+
+                                <button
+                                  onClick={() => {
+                                    alert(
+                                      "Delete feature পরের ধাপে যোগ করা হবে।"
+                                    );
+                                  }}
+                                  className="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
+                                >
+                                  Delete
+                                </button>
+
+                              </div>
+
+                            </td>
+
+                          </tr>
+
+                        ))
+
+                      )}
 
                     </tbody>
+
                   </table>
 
                 </div>
+
               </div>
 
             </section>
           )}
 
-          {/* ================= ADD NEWS ================= */}
+
+          {/* ================================================== */}
+          {/* ADD NEWS */}
+          {/* ================================================== */}
+
           {activeMenu === "Add News" && (
             <section>
 
@@ -502,12 +817,15 @@ export default function AdminDashboard() {
                 নতুন খবরের তথ্য দিন।
               </p>
 
+
               <div className="mt-6 max-w-3xl rounded-xl border border-gray-200 bg-white p-6">
 
                 <div className="space-y-5">
 
-                  {/* News Title */}
+                  {/* TITLE */}
+
                   <div>
+
                     <label className="mb-2 block text-sm font-bold">
                       News Title
                     </label>
@@ -519,10 +837,14 @@ export default function AdminDashboard() {
                       placeholder="খবরের শিরোনাম লিখুন"
                       className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-black"
                     />
+
                   </div>
 
-                  {/* Category */}
+
+                  {/* CATEGORY */}
+
                   <div>
+
                     <label className="mb-2 block text-sm font-bold">
                       Category
                     </label>
@@ -532,18 +854,44 @@ export default function AdminDashboard() {
                       onChange={(e) => setCategory(e.target.value)}
                       className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 outline-none focus:border-black"
                     >
-                      <option>দেশের কথা</option>
-                      <option>বিশ্বের জানালা</option>
-                      <option>বাংলার দিনলিপি</option>
-                      <option>মাঠের লড়াই</option>
-                      <option>রুপোলি পর্দা</option>
-                      <option>শরীর-মন</option>
-                      <option>ঘোরাঘুরি</option>
+
+                      <option>
+                        দেশের কথা
+                      </option>
+
+                      <option>
+                        বিশ্বের জানালা
+                      </option>
+
+                      <option>
+                        বাংলার দিনলিপি
+                      </option>
+
+                      <option>
+                        মাঠের লড়াই
+                      </option>
+
+                      <option>
+                        রুপোলি পর্দা
+                      </option>
+
+                      <option>
+                        শরীর-মন
+                      </option>
+
+                      <option>
+                        ঘোরাঘুরি
+                      </option>
+
                     </select>
+
                   </div>
 
-                  {/* Description */}
+
+                  {/* DESCRIPTION */}
+
                   <div>
+
                     <label className="mb-2 block text-sm font-bold">
                       Description
                     </label>
@@ -555,10 +903,14 @@ export default function AdminDashboard() {
                       placeholder="খবরের বিস্তারিত লিখুন"
                       className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-black"
                     />
+
                   </div>
 
-                  {/* News Image */}
+
+                  {/* IMAGE */}
+
                   <div>
+
                     <label className="mb-2 block text-sm font-bold">
                       News Image
                     </label>
@@ -582,10 +934,14 @@ export default function AdminDashboard() {
                       আপাতত শুধু image filename database-এ save হবে।
                       পরে Supabase Storage দিয়ে actual image upload করব।
                     </p>
+
                   </div>
 
-                  {/* Breaking News */}
+
+                  {/* BREAKING */}
+
                   <label className="flex items-center gap-3">
+
                     <input
                       type="checkbox"
                       checked={breaking}
@@ -596,11 +952,15 @@ export default function AdminDashboard() {
                     <span className="text-sm font-semibold">
                       Breaking News হিসেবে প্রকাশ করুন
                     </span>
+
                   </label>
 
-                  {/* Error */}
+
+                  {/* ERROR */}
+
                   {errorMessage && (
                     <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+
                       <p className="font-bold">
                         Publish করা যায়নি
                       </p>
@@ -608,25 +968,36 @@ export default function AdminDashboard() {
                       <p className="mt-1">
                         {errorMessage}
                       </p>
+
                     </div>
                   )}
 
-                  {/* Publish Button */}
+
+                  {/* PUBLISH */}
+
                   <button
                     onClick={handlePublish}
                     disabled={isPublishing}
                     className="rounded-lg bg-black px-6 py-3 font-bold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {isPublishing ? "Publishing..." : "Publish News"}
+                    {isPublishing
+                      ? "Publishing..."
+                      : "Publish News"
+                    }
                   </button>
 
                 </div>
+
               </div>
 
             </section>
           )}
 
-          {/* ================= CATEGORIES ================= */}
+
+          {/* ================================================== */}
+          {/* CATEGORIES */}
+          {/* ================================================== */}
+
           {activeMenu === "Categories" && (
             <section>
 
@@ -645,10 +1016,12 @@ export default function AdminDashboard() {
                   "শরীর-মন",
                   "ঘোরাঘুরি",
                 ].map((categoryName) => (
+
                   <div
                     key={categoryName}
                     className="rounded-xl border border-gray-200 bg-white p-5"
                   >
+
                     <h4 className="font-bold">
                       {categoryName}
                     </h4>
@@ -656,7 +1029,9 @@ export default function AdminDashboard() {
                     <p className="mt-1 text-sm text-gray-500">
                       Category
                     </p>
+
                   </div>
+
                 ))}
 
               </div>
@@ -664,7 +1039,11 @@ export default function AdminDashboard() {
             </section>
           )}
 
-          {/* ================= MEDIA ================= */}
+
+          {/* ================================================== */}
+          {/* MEDIA */}
+          {/* ================================================== */}
+
           {activeMenu === "Media" && (
             <section>
 
@@ -675,6 +1054,7 @@ export default function AdminDashboard() {
               <p className="mt-1 text-sm text-gray-500">
                 Website-এর ছবি ও media এখানে manage করা হবে।
               </p>
+
 
               <div className="mt-6 rounded-xl border-2 border-dashed border-gray-300 bg-white p-10 text-center">
 
@@ -699,7 +1079,11 @@ export default function AdminDashboard() {
             </section>
           )}
 
-          {/* ================= SETTINGS ================= */}
+
+          {/* ================================================== */}
+          {/* SETTINGS */}
+          {/* ================================================== */}
+
           {activeMenu === "Settings" && (
             <section>
 
@@ -711,12 +1095,15 @@ export default function AdminDashboard() {
                 Website-এর basic settings এখানে পরিবর্তন করা যাবে।
               </p>
 
+
               <div className="mt-6 max-w-3xl rounded-xl border border-gray-200 bg-white p-6">
 
                 <div className="space-y-6">
 
-                  {/* Logo */}
+                  {/* LOGO */}
+
                   <div>
+
                     <label className="mb-2 block text-sm font-bold">
                       Website Logo
                     </label>
@@ -738,10 +1125,14 @@ export default function AdminDashboard() {
                       />
 
                     </div>
+
                   </div>
 
-                  {/* Website Name */}
+
+                  {/* WEBSITE NAME */}
+
                   <div>
+
                     <label className="mb-2 block text-sm font-bold">
                       Website Name
                     </label>
@@ -751,10 +1142,14 @@ export default function AdminDashboard() {
                       defaultValue="বাংলার সংবাদ"
                       className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-black"
                     />
+
                   </div>
 
-                  {/* Tagline */}
+
+                  {/* TAGLINE */}
+
                   <div>
+
                     <label className="mb-2 block text-sm font-bold">
                       Tagline
                     </label>
@@ -764,20 +1159,25 @@ export default function AdminDashboard() {
                       defaultValue="সত্যের সঙ্গে, মানুষের পাশে"
                       className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-black"
                     />
+
                   </div>
+
 
                   <button className="rounded-lg bg-black px-6 py-3 font-bold text-white hover:bg-gray-800">
                     Save Settings
                   </button>
 
                 </div>
+
               </div>
 
             </section>
           )}
 
         </div>
+
       </div>
+
     </main>
   );
 }
