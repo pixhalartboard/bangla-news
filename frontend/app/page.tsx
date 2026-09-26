@@ -654,7 +654,7 @@ export default async function Home() {
             </Link>
 
           </div>
-
+git status
           <div className="mt-6 border-t border-blue-800 pt-4 text-sm text-blue-300">
             © 2026 {siteName}. All rights reserved.
           </div>
