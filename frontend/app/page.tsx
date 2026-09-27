@@ -31,7 +31,14 @@ const FIXED_CATEGORIES = [
   "ঘোরাঘুরি",
 ];
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
+  const { q } = await searchParams;
+  const searchQuery = q?.trim() || "";
+
   // =========================================================
   // SITE SETTINGS
   // =========================================================
@@ -57,10 +64,23 @@ export default async function Home() {
     .select(
       "id, title, description, category, image, published_at, breaking"
     )
+    .neq("category", "Health Talk")
     .order("published_at", { ascending: false });
 
   const settings = settingsData as SiteSettings | null;
-  const news = (newsData ?? []) as NewsItem[];
+  const allNews = (newsData ?? []) as NewsItem[];
+
+  const news = searchQuery
+    ? allNews.filter((item) => {
+        const query = searchQuery.toLocaleLowerCase("bn-BD");
+
+        return (
+          item.title?.toLocaleLowerCase("bn-BD").includes(query) ||
+          item.description?.toLocaleLowerCase("bn-BD").includes(query) ||
+          item.category?.toLocaleLowerCase("bn-BD").includes(query)
+        );
+      })
+    : allNews;
 
   // =========================================================
   // SITE DATA
@@ -77,14 +97,84 @@ export default async function Home() {
   // DATE
   // =========================================================
 
-  const today = new Date();
+  function toBengaliDigits(value: string | number) {
+    return String(value).replace(
+      /[0-9]/g,
+      (digit) => "০১২৩৪৫৬৭৮৯"[Number(digit)]
+    );
+  }
 
-  const formattedDate = today.toLocaleDateString("bn-BD", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  function formatBanglaHeaderDate(date: Date) {
+    const weekdays = [
+      "রবিবার",
+      "সোমবার",
+      "মঙ্গলবার",
+      "বুধবার",
+      "বৃহস্পতিবার",
+      "শুক্রবার",
+      "শনিবার",
+    ];
+
+    const gregorianMonths = [
+      "জানুয়ারি",
+      "ফেব্রুয়ারি",
+      "মার্চ",
+      "এপ্রিল",
+      "মে",
+      "জুন",
+      "জুলাই",
+      "আগস্ট",
+      "সেপ্টেম্বর",
+      "অক্টোবর",
+      "নভেম্বর",
+      "ডিসেম্বর",
+    ];
+
+    // পশ্চিমবঙ্গের প্রচলিত বাংলা পঞ্জিকা অনুযায়ী ২০২৬ সালের
+    // বাংলা মাসের শুরুর তারিখ।
+    const bengaliMonths = [
+      { name: "বৈশাখ", start: new Date(2026, 3, 15), year: 1433 },
+      { name: "জ্যৈষ্ঠ", start: new Date(2026, 4, 15), year: 1433 },
+      { name: "আষাঢ়", start: new Date(2026, 5, 15), year: 1433 },
+      { name: "শ্রাবণ", start: new Date(2026, 6, 16), year: 1433 },
+      { name: "ভাদ্র", start: new Date(2026, 7, 17), year: 1433 },
+      { name: "আশ্বিন", start: new Date(2026, 8, 18), year: 1433 },
+      { name: "কার্তিক", start: new Date(2026, 9, 18), year: 1433 },
+      { name: "অগ্রহায়ণ", start: new Date(2026, 10, 17), year: 1433 },
+      { name: "পৌষ", start: new Date(2026, 11, 17), year: 1433 },
+    ];
+
+    const current = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate()
+    );
+
+    let selectedMonth = bengaliMonths[0];
+
+    for (const month of bengaliMonths) {
+      if (current >= month.start) {
+        selectedMonth = month;
+      }
+    }
+
+    const diffDays = Math.floor(
+      (current.getTime() - selectedMonth.start.getTime()) /
+        (1000 * 60 * 60 * 24)
+    );
+
+    const bengaliDay = diffDays + 1;
+
+    return `${toBengaliDigits(bengaliDay)} ${
+      selectedMonth.name
+    } ${toBengaliDigits(selectedMonth.year)} • ${
+      weekdays[date.getDay()]
+    } • ${toBengaliDigits(date.getDate())} ${
+      gregorianMonths[date.getMonth()]
+    } ${toBengaliDigits(date.getFullYear())}`;
+  }
+
+  const formattedDate = formatBanglaHeaderDate(new Date());
 
   // =========================================================
   // MAIN NEWS
@@ -131,106 +221,57 @@ export default async function Home() {
       {/* =====================================================
           HEADER
       ====================================================== */}
-
       <header className="border-b-4 border-red-600 bg-white shadow-sm">
+        <div className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-5">
 
-        <div className="mx-auto max-w-7xl px-4">
+          <div className="flex items-center justify-between gap-3">
 
-          <div className="flex min-h-[135px] items-center justify-between gap-4 py-5">
-
-            {/* LOGO + SITE INFO */}
-
-            <div className="min-w-0 flex-1">
-
-              <Link href="/" className="inline-block">
-
-                <div className="flex items-center gap-4">
-
-                  {/* DATABASE LOGO */}
-
-                  {logoUrl ? (
-                    <img
-                      src={logoUrl}
-                      alt={siteName}
-                      className="h-24 w-24 rounded-xl object-contain md:h-28 md:w-28"
-                    />
-                  ) : (
-                    <div className="flex h-24 w-24 items-center justify-center rounded-xl bg-blue-900 text-3xl font-extrabold text-white md:h-28 md:w-28">
-                      বাং
-                    </div>
-                  )}
-
-                  {/* SITE NAME */}
-
-                  <div className="min-w-0">
-
-                    <h1 className="text-2xl font-extrabold text-blue-950 md:text-4xl">
-                      {siteName}
-                    </h1>
-
-                    <p className="mt-1 text-xs font-medium text-gray-600 md:text-sm">
-                      {tagline}
-                    </p>
-
-                    {/* DATE */}
-
-                    <p className="mt-2 text-xs font-bold text-red-600 md:text-sm">
-                      {formattedDate}
-                    </p>
-
-                  </div>
-
+            {/* LOGO */}
+            <Link href="/" className="shrink-0">
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={siteName}
+                  className="h-16 w-auto max-w-[180px] object-contain sm:h-20 sm:max-w-[230px] md:h-24 md:max-w-[280px]"
+                />
+              ) : (
+                <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-blue-900 text-xl font-extrabold text-white sm:h-20 sm:w-20">
+                  বাং
                 </div>
-
-              </Link>
-
-            </div>
+              )}
+            </Link>
 
             {/* SEARCH */}
-
-            <div className="hidden items-center gap-2 md:flex">
-
+            <form
+              action="/"
+              method="GET"
+              className="flex min-w-0 flex-1 justify-end gap-2"
+            >
               <input
-                type="text"
+                type="search"
+                name="q"
+                defaultValue={searchQuery}
                 placeholder="খবর খুঁজুন..."
-                className="w-56 rounded-lg border-2 border-blue-200 bg-white px-4 py-2 text-sm text-gray-900 outline-none transition focus:border-blue-900"
+                aria-label="খবর খুঁজুন"
+                className="min-w-0 w-full max-w-[420px] rounded-lg border-2 border-blue-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-blue-900 sm:px-4"
               />
 
               <button
-                type="button"
-                className="rounded-lg bg-blue-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-red-600"
+                type="submit"
+                className="shrink-0 rounded-lg bg-blue-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-600 sm:px-5"
               >
-                Search
+                খুঁজুন
               </button>
-
-            </div>
-
-            {/* MOBILE BUTTONS */}
-
-            <div className="flex gap-2 md:hidden">
-
-              <button
-                type="button"
-                className="rounded-lg border-2 border-blue-900 bg-white px-3 py-2 text-lg text-blue-900"
-                aria-label="Search"
-              >
-                🔍
-              </button>
-
-              <button
-                type="button"
-                className="rounded-lg border-2 border-blue-900 bg-white px-3 py-2 text-xl font-bold text-blue-900"
-                aria-label="Menu"
-              >
-                ☰
-              </button>
-
-            </div>
+            </form>
 
           </div>
 
-        </div>
+          {/* DATE */}
+          <div className="mt-2 text-sm font-semibold text-blue-950 sm:text-base">
+            {formattedDate}
+          </div>
 
+        </div>
       </header>
 
       {/* =====================================================
@@ -241,7 +282,7 @@ export default async function Home() {
 
         <div className="mx-auto max-w-7xl">
 
-          <div className="flex gap-6 overflow-x-auto px-4 py-3 text-sm font-semibold text-white">
+          <div className="flex gap-4 overflow-x-auto px-3 py-3 text-sm font-semibold text-white sm:gap-6 sm:px-4">
 
             {/* HOME ICON ONLY */}
 
@@ -265,6 +306,14 @@ export default async function Home() {
                 {category}
               </a>
             ))}
+
+            {/* HEALTH TALK - SEPARATE PAGE */}
+            <Link
+              href="/health-talk"
+              className="shrink-0 whitespace-nowrap transition hover:text-red-300"
+            >
+              Health Talk
+            </Link>
 
           </div>
 
@@ -353,11 +402,63 @@ export default async function Home() {
 
       <div className="mx-auto max-w-7xl px-4 py-8">
 
+        {searchQuery && (
+          <section className="mb-8 rounded-xl border border-blue-100 bg-blue-50 p-5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-xl font-extrabold text-blue-950">
+                  Search Results
+                </h2>
+
+                <p className="mt-1 text-sm text-gray-600">
+                  “{searchQuery}” এর জন্য {news.length}টি খবর পাওয়া গেছে।
+                </p>
+              </div>
+
+              <Link
+                href="/"
+                className="w-fit rounded-lg bg-blue-900 px-4 py-2 text-sm font-bold text-white hover:bg-red-600"
+              >
+                Search Clear
+              </Link>
+            </div>
+          </section>
+        )}
+
         {/* ===================================================
             NO NEWS
         ==================================================== */}
 
-        {!mainNews ? (
+        {searchQuery && !mainNews ? (
+
+          <div className="py-20 text-center">
+
+            <div className="mx-auto max-w-xl rounded-xl border border-blue-100 bg-blue-50 p-8">
+
+              <div className="mb-4 text-5xl">
+                🔍
+              </div>
+
+              <h2 className="text-2xl font-extrabold text-blue-900 md:text-3xl">
+                কোনও Search Result পাওয়া যায়নি
+              </h2>
+
+              <p className="mt-3 text-gray-600">
+                “{searchQuery}” নামে কোনও News পাওয়া যায়নি।
+              </p>
+
+              <Link
+                href="/"
+                className="mt-6 inline-block rounded-lg bg-blue-900 px-6 py-3 font-semibold text-white transition hover:bg-red-600"
+              >
+                Search Clear
+              </Link>
+
+            </div>
+
+          </div>
+
+        ) : !searchQuery && !mainNews ? (
 
           <div className="py-20 text-center">
 
@@ -512,9 +613,9 @@ export default async function Home() {
 
                     {/* CATEGORY HEADER */}
 
-                    <div className="mb-5 flex items-center justify-between border-b-2 border-blue-900 pb-3">
+                    <div className="mb-4 flex items-center justify-between gap-3 border-b-2 border-blue-900 pb-3 sm:mb-5">
 
-                      <h2 className="flex items-center gap-2 text-2xl font-extrabold text-blue-950">
+                      <h2 className="flex items-center gap-2 text-xl font-extrabold text-blue-950 sm:text-2xl">
 
                         <span className="h-7 w-1 rounded-full bg-red-600" />
 
@@ -619,44 +720,34 @@ export default async function Home() {
       {/* =====================================================
           FOOTER
       ====================================================== */}
-
       <footer className="mt-12 bg-blue-950 text-white">
 
-        <div className="mx-auto max-w-7xl px-4 py-8">
+        <div className="mx-auto max-w-7xl px-4 py-7">
 
-          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-
-            {/* SITE INFO */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 
             <div>
-
-              <h2 className="text-xl font-bold">
+              <p className="font-medium text-white">
                 {siteName}
-              </h2>
+              </p>
 
-              <p className="mt-2 text-sm text-blue-200">
+              <p className="mt-1 text-sm text-blue-200">
                 {tagline}
               </p>
-
-              <p className="mt-2 text-sm text-blue-300">
-                {formattedDate}
-              </p>
-
             </div>
 
-            {/* ADMIN PANEL */}
-
+            {/* ADMIN PANEL - NORMAL, NOT HIGHLIGHTED */}
             <Link
               href="/admin"
-              className="inline-flex w-fit items-center gap-2 rounded-lg bg-red-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-red-700"
+              className="text-sm text-blue-200 transition hover:text-white"
             >
-              ⚙️ Admin Panel
+              অ্যাডমিন প্যানেল
             </Link>
 
           </div>
-git status
-          <div className="mt-6 border-t border-blue-800 pt-4 text-sm text-blue-300">
-            © 2026 {siteName}. All rights reserved.
+
+          <div className="mt-5 border-t border-blue-800 pt-4 text-sm text-blue-300">
+            © 2026 {siteName}. সর্বস্বত্ব সংরক্ষিত।
           </div>
 
         </div>

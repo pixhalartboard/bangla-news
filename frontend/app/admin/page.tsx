@@ -11,6 +11,7 @@ type NewsItem = {
   image: string | null;
   published_at: string;
   breaking: boolean;
+  youtube_url?: string | null;
 };
 
 type SiteSettings = {
@@ -35,6 +36,7 @@ const categories = [
   "রুপোলি পর্দা",
   "শরীর-মন",
   "ঘোরাঘুরি",
+  "Health Talk",
 ];
 
 const menuItems = [
@@ -44,6 +46,7 @@ const menuItems = [
   "Categories",
   "Media",
   "Settings",
+  "Health Talk",
 ];
 
 const BUCKET = "news-images";
@@ -71,6 +74,7 @@ export default function AdminDashboard() {
   const [description, setDescription] = useState("");
   const [breaking, setBreaking] = useState(false);
   const [image, setImage] = useState<File | null>(null);
+  const [youtubeUrl, setYoutubeUrl] = useState("");
 
   // =========================================================
   // EDIT
@@ -281,6 +285,7 @@ export default function AdminDashboard() {
     setDescription("");
     setBreaking(false);
     setImage(null);
+    setYoutubeUrl("");
     setEditingId(null);
     setOldImage(null);
 
@@ -434,6 +439,10 @@ export default function AdminDashboard() {
                 description.trim(),
               image: imageUrl,
               breaking,
+              youtube_url:
+                category === "Health Talk"
+                  ? youtubeUrl.trim() || null
+                  : null,
             })
             .eq("id", editingId);
 
@@ -479,6 +488,10 @@ export default function AdminDashboard() {
                   description.trim(),
                 image: imageUrl,
                 breaking,
+                youtube_url:
+                  category === "Health Talk"
+                    ? youtubeUrl.trim() || null
+                    : null,
               },
             ]);
 
@@ -540,6 +553,8 @@ export default function AdminDashboard() {
     );
 
     setBreaking(item.breaking);
+
+    setYoutubeUrl(item.youtube_url || "");
 
     setOldImage(item.image);
 
@@ -1338,6 +1353,28 @@ export default function AdminDashboard() {
                   )}
                 </select>
               </div>
+
+              {category === "Health Talk" && (
+                <div>
+                  <label className="mb-2 block text-sm font-bold">
+                    YouTube Video Link
+                  </label>
+
+                  <input
+                    type="url"
+                    value={youtubeUrl}
+                    onChange={(e) =>
+                      setYoutubeUrl(e.target.value)
+                    }
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-black"
+                  />
+
+                  <p className="mt-2 text-xs text-gray-500">
+                    Health Talk-এর YouTube ভিডিওর link এখানে দিন।
+                  </p>
+                </div>
+              )}
 
               {/* DESCRIPTION */}
 
@@ -2427,6 +2464,34 @@ export default function AdminDashboard() {
           {activeMenu ===
             "Settings" &&
             renderSettings()}
+
+          {activeMenu === "Health Talk" && (
+            <section>
+              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+                <div>
+                  <h3 className="text-2xl font-bold">
+                    Health Talk
+                  </h3>
+
+                  <p className="mt-1 text-sm text-gray-500">
+                    YouTube-এর Health Talk ভিডিও publish করুন।
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetForm();
+                    setCategory("Health Talk");
+                    setActiveMenu("Add News");
+                  }}
+                  className="rounded-lg bg-black px-5 py-3 text-sm font-bold text-white hover:bg-gray-800"
+                >
+                  + Add Health Talk
+                </button>
+              </div>
+            </section>
+          )}
         </div>
       </div>
     </main>
