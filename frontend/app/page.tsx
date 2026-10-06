@@ -25,18 +25,19 @@ const FIXED_CATEGORIES = [
   "দেশের কথা",
   "বিশ্বের জানালা",
   "বাংলার দিনলিপি",
-  "মাঠের লড়াই",
+  "মাঠের লড়াই",
   "রুপোলি পর্দা",
   "শরীর-মন",
   "ঘোরাঘুরি",
 ];
 
-export default async function Home({
-  searchParams,
-}: {
+interface PageProps {
   searchParams: Promise<{ q?: string }>;
-}) {
-  const { q } = await searchParams;
+}
+
+export default async function Home({ searchParams }: PageProps) {
+  const resolvedSearchParams = await searchParams;
+  const q = resolvedSearchParams.q;
   const searchQuery = q?.trim() || "";
 
   // =========================================================
@@ -94,7 +95,7 @@ export default async function Home({
   const logoUrl = settings?.logo_url || null;
 
   // =========================================================
-  // DATE
+  // DATE (Compact & Clean)
   // =========================================================
 
   function toBengaliDigits(value: string | number) {
@@ -116,8 +117,8 @@ export default async function Home({
     ];
 
     const gregorianMonths = [
-      "জানুয়ারি",
-      "ফেব্রুয়ারি",
+      "জানুয়ারি",
+      "ফেব্রুয়ারি",
       "মার্চ",
       "এপ্রিল",
       "মে",
@@ -130,8 +131,6 @@ export default async function Home({
       "ডিসেম্বর",
     ];
 
-    // পশ্চিমবঙ্গের প্রচলিত বাংলা পঞ্জিকা অনুযায়ী ২০২৬ সালের
-    // বাংলা মাসের শুরুর তারিখ।
     const bengaliMonths = [
       { name: "বৈশাখ", start: new Date(2026, 3, 15), year: 1433 },
       { name: "জ্যৈষ্ঠ", start: new Date(2026, 4, 15), year: 1433 },
@@ -165,13 +164,8 @@ export default async function Home({
 
     const bengaliDay = diffDays + 1;
 
-    return `${toBengaliDigits(bengaliDay)} ${
-      selectedMonth.name
-    } ${toBengaliDigits(selectedMonth.year)} • ${
-      weekdays[date.getDay()]
-    } • ${toBengaliDigits(date.getDate())} ${
-      gregorianMonths[date.getMonth()]
-    } ${toBengaliDigits(date.getFullYear())}`;
+    // সংক্ষিপ্ত ও সুন্দর ফরম্যাট
+    return `${weekdays[date.getDay()]}, ${toBengaliDigits(bengaliDay)} ${selectedMonth.name} ${toBengaliDigits(selectedMonth.year)} | ${toBengaliDigits(date.getDate())} ${gregorianMonths[date.getMonth()]} ${toBengaliDigits(date.getFullYear())}`;
   }
 
   const formattedDate = formatBanglaHeaderDate(new Date());
@@ -186,7 +180,6 @@ export default async function Home({
 
   // =========================================================
   // CATEGORY-WISE NEWS
-  // Only fixed 7 categories will be displayed
   // =========================================================
 
   const categoryMap: Record<string, NewsItem[]> = {};
@@ -266,8 +259,8 @@ export default async function Home({
 
           </div>
 
-          {/* DATE */}
-          <div className="mt-2 text-sm font-semibold text-blue-950 sm:text-base">
+          {/* COMPACT & SMALLER DATE (Icon Removed) */}
+          <div className="mt-2 text-[11px] font-semibold text-gray-600 sm:text-xs">
             {formattedDate}
           </div>
 
@@ -332,7 +325,7 @@ export default async function Home({
           <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-yellow-800">
 
             <p className="font-bold">
-              Site Settings load হয়নি
+              Site Settings load হয়নি
             </p>
 
             <p className="mt-1 text-sm">
@@ -356,7 +349,7 @@ export default async function Home({
           <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-700">
 
             <p className="font-bold">
-              News load করা যায়নি
+              News load করা যায়নি
             </p>
 
             <p className="mt-1 text-sm">
@@ -411,7 +404,7 @@ export default async function Home({
                 </h2>
 
                 <p className="mt-1 text-sm text-gray-600">
-                  “{searchQuery}” এর জন্য {news.length}টি খবর পাওয়া গেছে।
+                  “{searchQuery}” এর জন্য {news.length}টি খবর পাওয়া গেছে।
                 </p>
               </div>
 
@@ -440,11 +433,11 @@ export default async function Home({
               </div>
 
               <h2 className="text-2xl font-extrabold text-blue-900 md:text-3xl">
-                কোনও Search Result পাওয়া যায়নি
+                কোনও Search Result পাওয়া যায়নি
               </h2>
 
               <p className="mt-3 text-gray-600">
-                “{searchQuery}” নামে কোনও News পাওয়া যায়নি।
+                “{searchQuery}” নামে কোনও News পাওয়া যায়নি।
               </p>
 
               <Link
@@ -469,7 +462,7 @@ export default async function Home({
               </div>
 
               <h2 className="text-2xl font-extrabold text-blue-900 md:text-3xl">
-                এখনও কোনও News প্রকাশিত হয়নি
+                এখনও কোনও News প্রকাশিত হয়নি
               </h2>
 
               <p className="mt-3 text-gray-600">
@@ -501,35 +494,37 @@ export default async function Home({
 
               <section className="lg:col-span-2">
 
-                <Link href={`/news/${mainNews.id}`}>
+                {mainNews && (
+                  <Link href={`/news/${mainNews.id}`}>
 
-                  <div className="mb-5">
+                    <div className="mb-5">
 
-                    <span className="text-sm font-bold text-red-600">
-                      প্রধান খবর
-                    </span>
+                      <span className="text-sm font-bold text-red-600">
+                        প্রধান খবর
+                      </span>
 
-                    <h2 className="mt-2 text-3xl font-extrabold leading-tight text-blue-950 transition hover:text-red-600 md:text-4xl">
-                      {mainNews.title}
-                    </h2>
+                      <h2 className="mt-2 text-3xl font-extrabold leading-tight text-blue-950 transition hover:text-red-600 md:text-4xl">
+                        {mainNews.title}
+                      </h2>
 
-                    <p className="mt-3 text-gray-600">
-                      {mainNews.description}
-                    </p>
+                      <p className="mt-3 text-gray-600">
+                        {mainNews.description}
+                      </p>
 
-                  </div>
+                    </div>
 
-                  <div className="overflow-hidden rounded-xl border border-blue-100">
+                    <div className="overflow-hidden rounded-xl border border-blue-100">
 
-                    <img
-                      src={mainNews.image || "/news-placeholder.jpg"}
-                      alt={mainNews.title}
-                      className="h-64 w-full object-cover transition duration-300 hover:scale-105 md:h-96"
-                    />
+                      <img
+                        src={mainNews.image || "/news-placeholder.jpg"}
+                        alt={mainNews.title}
+                        className="h-64 w-full object-cover transition duration-300 hover:scale-105 md:h-96"
+                      />
 
-                  </div>
+                    </div>
 
-                </Link>
+                  </Link>
+                )}
 
               </section>
 
@@ -596,8 +591,6 @@ export default async function Home({
 
                 const categoryNews =
                   categoryMap[category].slice(0, 6);
-
-                // Do not show empty category sections
 
                 if (categoryNews.length === 0) {
                   return null;
@@ -690,7 +683,7 @@ export default async function Home({
                               </p>
 
                               <p className="mt-3 text-sm font-bold text-red-600">
-                                বিস্তারিত পড়ুন →
+                                বিস্তারিত পড়ুন →
                               </p>
 
                             </div>
@@ -736,7 +729,7 @@ export default async function Home({
               </p>
             </div>
 
-            {/* ADMIN PANEL - NORMAL, NOT HIGHLIGHTED */}
+            {/* ADMIN PANEL */}
             <Link
               href="/admin"
               className="text-sm text-blue-200 transition hover:text-white"
