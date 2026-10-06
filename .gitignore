@@ -1,1 +1,4 @@
 password.txt
+node_modules/
+.env.local
+.next/

@@ -23,6 +23,11 @@ type SiteSettings = {
   logo_url: string | null;
 };
 
+type NewsView = {
+  news_id: number | null;
+  viewed_at: string;
+};
+
 type MediaFile = {
   name: string;
   path: string;
@@ -167,6 +172,14 @@ export default function AdminDashboard() {
     useState("");
 
   // =========================================================
+  // VIEWS ANALYTICS
+  // =========================================================
+
+  const [newsViews, setNewsViews] = useState<NewsView[]>([]);
+  const [isLoadingViews, setIsLoadingViews] = useState(false);
+
+
+  // =========================================================
   // FETCH NEWS
   // =========================================================
 
@@ -283,6 +296,49 @@ export default function AdminDashboard() {
   };
 
   // =========================================================
+  // FETCH VIEWS
+  // =========================================================
+
+  const fetchViews = async () => {
+    setIsLoadingViews(true);
+
+    try {
+      const allViews: NewsView[] = [];
+      const pageSize = 1000;
+      let from = 0;
+
+      while (true) {
+        const supabaseAuth = createBrowserClient();
+
+        const { data, error } = await supabaseAuth
+          .from("news_views")
+          .select("news_id, viewed_at")
+          .order("viewed_at", { ascending: false })
+          .range(from, from + pageSize - 1);
+
+        if (error) {
+          console.error("Fetch Views Error:", error);
+          setNewsViews([]);
+          return;
+        }
+
+        const page = (data ?? []) as NewsView[];
+        allViews.push(...page);
+
+        if (page.length < pageSize) break;
+        from += pageSize;
+      }
+
+      setNewsViews(allViews);
+    } catch (error) {
+      console.error("Fetch Views Unexpected Error:", error);
+      setNewsViews([]);
+    } finally {
+      setIsLoadingViews(false);
+    }
+  };
+
+  // =========================================================
   // LOAD EVERYTHING
   // =========================================================
 
@@ -290,6 +346,7 @@ export default function AdminDashboard() {
     fetchNews();
     fetchSettings();
     fetchMedia();
+    fetchViews();
   }, []);
 
   // =========================================================
@@ -1047,6 +1104,124 @@ export default function AdminDashboard() {
     ]);
 
   // =========================================================
+  // VIEWS ANALYTICS
+  // =========================================================
+
+  const viewAnalytics = useMemo(() => {
+    const now = new Date();
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const startOfThisMonth = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      1
+    );
+
+    const startOfLastMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() - 1,
+      1
+    );
+
+    const endOfLastMonth = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      1
+    );
+
+    const todayViews = newsViews.filter(
+      (view) => new Date(view.viewed_at) >= startOfToday
+    ).length;
+
+    const thisMonthViews = newsViews.filter(
+      (view) => new Date(view.viewed_at) >= startOfThisMonth
+    ).length;
+
+    const lastMonthViews = newsViews.filter((view) => {
+      const date = new Date(view.viewed_at);
+      return date >= startOfLastMonth && date < endOfLastMonth;
+    }).length;
+
+    const totalViews = newsViews.length;
+
+    const monthlyViews = Array.from({ length: 12 }, (_, index) => {
+      const monthDate = new Date(
+        now.getFullYear(),
+        now.getMonth() - (11 - index),
+        1
+      );
+      const nextMonth = new Date(
+        monthDate.getFullYear(),
+        monthDate.getMonth() + 1,
+        1
+      );
+
+      const count = newsViews.filter((view) => {
+        const date = new Date(view.viewed_at);
+        return date >= monthDate && date < nextMonth;
+      }).length;
+
+      return {
+        key: `${monthDate.getFullYear()}-${monthDate.getMonth()}`,
+        label: monthDate.toLocaleDateString("bn-BD", {
+          month: "short",
+        }),
+        count,
+      };
+    });
+
+    const viewsByNews = new Map<number, number>();
+
+    newsViews.forEach((view) => {
+      if (view.news_id === null) return;
+      viewsByNews.set(
+        view.news_id,
+        (viewsByNews.get(view.news_id) || 0) + 1
+      );
+    });
+
+    const topNews = newsList
+      .map((news) => ({
+        ...news,
+        views: viewsByNews.get(news.id) || 0,
+      }))
+      .sort((a, b) => b.views - a.views)
+      .slice(0, 5);
+
+    const categoryViews: Record<string, number> = {};
+
+    newsViews.forEach((view) => {
+      if (view.news_id === null) return;
+
+      const news = newsList.find(
+        (item) => item.id === view.news_id
+      );
+
+      if (!news) return;
+
+      categoryViews[news.category] =
+        (categoryViews[news.category] || 0) + 1;
+    });
+
+    const maxMonthlyViews = Math.max(
+      ...monthlyViews.map((item) => item.count),
+      1
+    );
+
+    return {
+      todayViews,
+      thisMonthViews,
+      lastMonthViews,
+      totalViews,
+      monthlyViews,
+      topNews,
+      categoryViews,
+      maxMonthlyViews,
+    };
+  }, [newsViews, newsList]);
+
+  // =========================================================
   // DASHBOARD
   // =========================================================
 
@@ -1112,6 +1287,162 @@ export default function AdminDashboard() {
               </h3>
             </div>
           </div>
+
+          {/* VIEWS ANALYTICS */}
+
+          <section className="mt-8">
+            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+              <div>
+                <h3 className="text-xl font-bold">
+                  Views Analytics
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Website-এর News কতবার দেখা হয়েছে তার overview।
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={fetchViews}
+                disabled={isLoadingViews}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-bold hover:bg-gray-100 disabled:opacity-50"
+              >
+                {isLoadingViews ? "Loading..." : "↻ Refresh Views"}
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-xl border border-gray-200 bg-white p-5">
+                <p className="text-sm text-gray-500">Today Views</p>
+                <h4 className="mt-2 text-3xl font-extrabold">
+                  {viewAnalytics.todayViews}
+                </h4>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-white p-5">
+                <p className="text-sm text-gray-500">This Month</p>
+                <h4 className="mt-2 text-3xl font-extrabold">
+                  {viewAnalytics.thisMonthViews}
+                </h4>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-white p-5">
+                <p className="text-sm text-gray-500">Last Month</p>
+                <h4 className="mt-2 text-3xl font-extrabold">
+                  {viewAnalytics.lastMonthViews}
+                </h4>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-white p-5">
+                <p className="text-sm text-gray-500">Total Views</p>
+                <h4 className="mt-2 text-3xl font-extrabold">
+                  {viewAnalytics.totalViews}
+                </h4>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-6 lg:grid-cols-2">
+              <div className="rounded-xl border border-gray-200 bg-white p-6">
+                <h4 className="font-bold">Last 12 Months</h4>
+
+                <div className="mt-6 flex h-56 items-end gap-2 overflow-x-auto">
+                  {viewAnalytics.monthlyViews.map((month) => {
+                    const height =
+                      month.count === 0
+                        ? 4
+                        : Math.max(
+                            8,
+                            Math.round(
+                              (month.count /
+                                viewAnalytics.maxMonthlyViews) *
+                                100
+                            )
+                          );
+
+                    return (
+                      <div
+                        key={month.key}
+                        className="flex min-w-[42px] flex-1 flex-col items-center justify-end gap-2"
+                      >
+                        <span className="text-[10px] font-bold text-gray-600">
+                          {month.count}
+                        </span>
+
+                        <div className="flex h-40 w-full items-end rounded-md bg-gray-100">
+                          <div
+                            className="w-full rounded-md bg-black"
+                            style={{
+                              height: `${height}%`,
+                            }}
+                          />
+                        </div>
+
+                        <span className="text-[10px] text-gray-500">
+                          {month.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-white p-6">
+                <h4 className="font-bold">Most Viewed News</h4>
+
+                <div className="mt-4 space-y-3">
+                  {viewAnalytics.topNews.length === 0 ? (
+                    <p className="text-sm text-gray-500">
+                      এখনও কোনও view data নেই।
+                    </p>
+                  ) : (
+                    viewAnalytics.topNews.map((news, index) => (
+                      <div
+                        key={news.id}
+                        className="flex items-center justify-between gap-3 border-b border-gray-100 pb-3 last:border-0"
+                      >
+                        <div className="flex min-w-0 items-center gap-3">
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black text-xs font-bold text-white">
+                            {index + 1}
+                          </span>
+
+                          <p className="truncate text-sm font-semibold">
+                            {news.title}
+                          </p>
+                        </div>
+
+                        <span className="shrink-0 rounded-full bg-gray-100 px-3 py-1 text-xs font-bold">
+                          {news.views}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6">
+              <h4 className="font-bold">Category-wise Views</h4>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {categories.map((cat) => (
+                  <div
+                    key={cat}
+                    className="rounded-lg border border-gray-100 bg-gray-50 p-4"
+                  >
+                    <p className="truncate text-sm font-semibold">
+                      {cat}
+                    </p>
+
+                    <p className="mt-2 text-2xl font-extrabold">
+                      {viewAnalytics.categoryViews[cat] || 0}
+                    </p>
+
+                    <p className="text-xs text-gray-500">Views</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
 
           {/* QUICK ACTIONS */}
 

@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
-
+import ViewTracker from "./ViewTracker";
 export const dynamic = "force-dynamic";
 
 type NewsItem = {
@@ -403,6 +403,7 @@ export default async function NewsDetails({
           NEWS CONTENT
       ====================================================== */}
       <article className="mx-auto max-w-4xl px-4 py-8 sm:py-10">
+        <ViewTracker newsId={newsArticle.id} />
 
         {/* CATEGORY */}
         <p className="mb-3 text-sm font-bold text-red-600">
