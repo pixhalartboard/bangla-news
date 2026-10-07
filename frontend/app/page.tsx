@@ -616,10 +616,6 @@ export default async function Home({ searchParams }: PageProps) {
 
                       </h2>
 
-                      <span className="text-sm font-bold text-red-600">
-                        {categoryMap[category].length}টি খবর
-                      </span>
-
                     </div>
 
                     {/* NEWS CARDS */}
