@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 
@@ -58,6 +58,21 @@ const menuItems = [
 
 const BUCKET = "news-images";
 
+
+function createNewsSlug(title: string, uniqueId?: number): string {
+  const slug = title
+    .normalize("NFC")
+    .trim()
+    .toLowerCase()
+    // Preserve Bengali vowel signs and other combining marks.
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "");
+
+  const base = slug || "news";
+  return uniqueId !== undefined ? `${base}-${uniqueId}` : base;
+}
+
+
 export default function AdminDashboard() {
   // =========================================================
   // MENU
@@ -94,6 +109,7 @@ export default function AdminDashboard() {
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState(categories[0]);
   const [description, setDescription] = useState("");
+  const descriptionEditorRef = useRef<HTMLDivElement>(null);
   const [breaking, setBreaking] = useState(false);
   const [image, setImage] = useState<File | null>(null);
   const [youtubeUrl, setYoutubeUrl] = useState("");
@@ -357,6 +373,7 @@ export default function AdminDashboard() {
     setTitle("");
     setCategory(categories[0]);
     setDescription("");
+    if (descriptionEditorRef.current) descriptionEditorRef.current.innerHTML = "";
     setBreaking(false);
     setImage(null);
     setYoutubeUrl("");
@@ -508,6 +525,7 @@ export default function AdminDashboard() {
             .from("news")
             .update({
               title: title.trim(),
+              slug: createNewsSlug(title, editingId!),
               category,
               description:
                 description.trim(),
@@ -557,6 +575,7 @@ export default function AdminDashboard() {
             .insert([
               {
                 title: title.trim(),
+                slug: createNewsSlug(title, Date.now()),
                 category,
                 description:
                   description.trim(),
@@ -622,9 +641,15 @@ export default function AdminDashboard() {
 
     setCategory(item.category);
 
-    setDescription(
-      item.description
-    );
+    setDescription(item.description);
+    if (descriptionEditorRef.current) {
+      const savedDescription = item.description || "";
+      if (/<\/?(p|br|strong|b|em|i|u|mark|h[1-6]|ul|ol|li|a)\b/i.test(savedDescription)) {
+        descriptionEditorRef.current.innerHTML = savedDescription;
+      } else {
+        descriptionEditorRef.current.textContent = savedDescription;
+      }
+    }
 
     setBreaking(item.breaking);
 
@@ -1225,6 +1250,26 @@ export default function AdminDashboard() {
   // DASHBOARD
   // =========================================================
 
+  const applyTextFormat = (command: string, value?: string) => {
+    const editor = descriptionEditorRef.current;
+    if (!editor) return;
+    editor.focus();
+    if (command === "createLink") {
+      const url = window.prompt("লিংকটি লিখুন (https://...)");
+      if (!url) return;
+      document.execCommand(command, false, url);
+    } else {
+      document.execCommand(command, false, value);
+    }
+    setDescription(editor.innerHTML);
+  };
+
+  const handleDescriptionInput = () => {
+    if (descriptionEditorRef.current) {
+      setDescription(descriptionEditorRef.current.innerHTML);
+    }
+  };
+
   const renderDashboard =
     () => {
       const totalNews =
@@ -1724,26 +1769,57 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              {/* DESCRIPTION */}
+              {/* DESCRIPTION / RICH TEXT EDITOR */}
 
               <div>
                 <label className="mb-2 block text-sm font-bold">
                   Description
                 </label>
 
-                <textarea
-                  rows={7}
-                  value={
-                    description
-                  }
-                  onChange={(e) =>
-                    setDescription(
-                      e.target.value
-                    )
-                  }
-                  placeholder="খবরের বিস্তারিত লিখুন"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-black"
-                />
+                <div className="overflow-hidden rounded-lg border border-gray-300 focus-within:border-black">
+                  <div className="flex flex-wrap gap-1 border-b border-gray-200 bg-gray-50 p-2">
+                    {[
+                      { label: "B", command: "bold", title: "Bold" },
+                      { label: "I", command: "italic", title: "Italic" },
+                      { label: "U", command: "underline", title: "Underline" },
+                      { label: "S", command: "strikeThrough", title: "Strikethrough" },
+                    ].map((tool) => (
+                      <button
+                        key={tool.command}
+                        type="button"
+                        title={tool.title}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => applyTextFormat(tool.command)}
+                        className="min-w-9 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-bold hover:bg-gray-100"
+                      >
+                        <span className={tool.command === "italic" ? "italic" : tool.command === "underline" ? "underline" : tool.command === "strikeThrough" ? "line-through" : ""}>
+                          {tool.label}
+                        </span>
+                      </button>
+                    ))}
+                    <button type="button" title="Highlight" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextFormat("hiliteColor", "#fff176")} className="rounded border border-gray-200 bg-white px-3 py-2 text-sm font-bold hover:bg-yellow-100">Highlight</button>
+                    <button type="button" title="Heading" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextFormat("formatBlock", "h2")} className="rounded border border-gray-200 bg-white px-3 py-2 text-sm font-bold hover:bg-gray-100">H2</button>
+                    <button type="button" title="Subheading" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextFormat("formatBlock", "h3")} className="rounded border border-gray-200 bg-white px-3 py-2 text-sm font-bold hover:bg-gray-100">H3</button>
+                    <button type="button" title="Paragraph" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextFormat("formatBlock", "p")} className="rounded border border-gray-200 bg-white px-3 py-2 text-sm font-bold hover:bg-gray-100">P</button>
+                    <button type="button" title="Bullet list" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextFormat("insertUnorderedList")} className="rounded border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-100">• List</button>
+                    <button type="button" title="Numbered list" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextFormat("insertOrderedList")} className="rounded border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-100">1. List</button>
+                    <button type="button" title="Add link" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextFormat("createLink")} className="rounded border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-100">Link</button>
+                    <button type="button" title="Remove formatting" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextFormat("removeFormat")} className="rounded border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-100">Clear Format</button>
+                  </div>
+
+                  <div
+                    ref={descriptionEditorRef}
+                    contentEditable
+                    suppressContentEditableWarning
+                    onInput={handleDescriptionInput}
+                    role="textbox"
+                    aria-multiline="true"
+                    className="min-h-[220px] w-full whitespace-pre-wrap px-4 py-3 text-base leading-8 outline-none [&_h2]:my-3 [&_h2]:text-2xl [&_h2]:font-bold [&_h3]:my-2 [&_h3]:text-xl [&_h3]:font-bold [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-7 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-7 [&_a]:text-blue-700 [&_a]:underline"
+                  />
+                </div>
+                <p className="mt-2 text-xs text-gray-500">
+                  লেখা select করে toolbar ব্যবহার করুন। Bold, Italic, Underline, Highlight, Heading, List ও Link যোগ করা যাবে।
+                </p>
               </div>
 
               {/* CURRENT IMAGE */}

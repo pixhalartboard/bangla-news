@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 
 type NewsItem = {
   id: number;
+  slug: string | null;
   title: string;
   description: string;
   category: string;
@@ -123,12 +124,26 @@ export default async function NewsDetails({
 }) {
   const { id } = await params;
 
-  const [{ data: article, error }, { data: settings }] = await Promise.all([
-    supabase
+  
+
+const decodedId = decodeURIComponent(id);
+
+const articleQuery = /^\d+$/.test(decodedId)
+  ? supabase
       .from("news")
       .select("*")
-      .eq("id", Number(id))
-      .single(),
+      .eq("id", Number(decodedId))
+      .maybeSingle()
+  : supabase
+      .from("news")
+      .select("*")
+      .eq("slug", decodedId)
+      .maybeSingle();
+
+
+const [{ data: article, error }, { data: settings }] =
+  await Promise.all([
+    articleQuery,
 
     supabase
       .from("site_settings")
@@ -136,6 +151,7 @@ export default async function NewsDetails({
       .eq("id", 1)
       .maybeSingle(),
   ]);
+
 
   const site: SiteSettings = {
     site_name: settings?.site_name ?? "Time Lock News",
@@ -437,9 +453,22 @@ export default async function NewsDetails({
         </div>
 
         {/* DESCRIPTION */}
-        <div className="mt-8 text-lg leading-8 text-gray-700">
-          <p>{newsArticle.description}</p>
-        </div>
+        
+{/* DESCRIPTION */}
+{/* DESCRIPTION */}
+<div
+  className="mt-8 text-lg leading-8 text-gray-700
+    [&_p]:mb-4
+    [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:pl-6
+    [&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6
+    [&_li]:mb-2"
+  dangerouslySetInnerHTML={{
+    __html: newsArticle.description
+      .replace(/\r\n/g, "\n")
+      .replace(/\n/g, "<br />"),
+  }}
+/>
+
 
         {/* BACK */}
         <div className="mt-10">
