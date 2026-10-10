@@ -60,18 +60,51 @@ const BUCKET = "news-images";
 
 
 function createNewsSlug(title: string, uniqueId?: number): string {
-  const slug = title
-    .normalize("NFC")
-    .trim()
-    .toLowerCase()
-    // Preserve Bengali vowel signs and other combining marks.
-    .replace(/[^\p{L}\p{M}\p{N}]+/gu, "-")
-    .replace(/^-+|-+$/g, "");
-
-  const base = slug || "news";
+  // Bengali headline stays unchanged; only the URL slug is transliterated to English letters.
+  const consonants: Record<string, string> = {
+    "ক":"k","খ":"kh","গ":"g","ঘ":"gh","ঙ":"ng",
+    "চ":"ch","ছ":"chh","জ":"j","ঝ":"jh","ঞ":"ny",
+    "ট":"t","ঠ":"th","ড":"d","ঢ":"dh","ণ":"n",
+    "ত":"t","থ":"th","দ":"d","ধ":"dh","ন":"n",
+    "প":"p","ফ":"ph","ব":"b","ভ":"bh","ম":"m",
+    "য":"j","র":"r","ল":"l","শ":"sh","ষ":"sh","স":"s","হ":"h",
+    "ড়":"r","ঢ়":"rh","য়":"y","ৎ":"t"
+  };
+  const vowels: Record<string, string> = {
+    "অ":"o","আ":"a","ই":"i","ঈ":"i","উ":"u","ঊ":"u",
+    "ঋ":"ri","এ":"e","ঐ":"oi","ও":"o","ঔ":"ou"
+  };
+  const signs: Record<string, string> = {
+    "া":"a","ি":"i","ী":"i","ু":"u","ূ":"u","ৃ":"ri",
+    "ে":"e","ৈ":"oi","ো":"o","ৌ":"ou","্":""
+  };
+  const marks: Record<string, string> = {"ং":"ng","ঃ":"h","ঁ":"n"};
+  const chars = Array.from(title.normalize("NFC").trim().toLowerCase());
+  let output = "";
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i];
+    if (consonants[ch]) {
+      output += consonants[ch];
+      const next = chars[i + 1];
+      // Add Bengali's inherent "o" sound unless a vowel sign/virama follows.
+      if (!next || !(next in signs)) output += "o";
+    } else if (vowels[ch]) {
+      output += vowels[ch];
+    } else if (signs[ch] !== undefined) {
+      output += signs[ch];
+    } else if (marks[ch]) {
+      output += marks[ch];
+    } else if (/[a-z0-9]/.test(ch)) {
+      output += ch;
+    } else {
+      output += "-";
+    }
+  }
+  const base = output
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "news";
   return uniqueId !== undefined ? `${base}-${uniqueId}` : base;
 }
-
 
 export default function AdminDashboard() {
   // =========================================================
