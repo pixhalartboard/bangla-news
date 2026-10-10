@@ -14,6 +14,7 @@ type NewsItem = {
   published_at: string;
   breaking: boolean;
   youtube_url?: string | null;
+  slug?: string | null;
 };
 
 type SiteSettings = {
@@ -59,50 +60,31 @@ const menuItems = [
 const BUCKET = "news-images";
 
 
-function createNewsSlug(title: string, uniqueId?: number): string {
-  // Bengali headline stays unchanged; only the URL slug is transliterated to English letters.
-  const consonants: Record<string, string> = {
-    "ক":"k","খ":"kh","গ":"g","ঘ":"gh","ঙ":"ng",
-    "চ":"ch","ছ":"chh","জ":"j","ঝ":"jh","ঞ":"ny",
-    "ট":"t","ঠ":"th","ড":"d","ঢ":"dh","ণ":"n",
-    "ত":"t","থ":"th","দ":"d","ধ":"dh","ন":"n",
-    "প":"p","ফ":"ph","ব":"b","ভ":"bh","ম":"m",
-    "য":"j","র":"r","ল":"l","শ":"sh","ষ":"sh","স":"s","হ":"h",
-    "ড়":"r","ঢ়":"rh","য়":"y","ৎ":"t"
-  };
-  const vowels: Record<string, string> = {
-    "অ":"o","আ":"a","ই":"i","ঈ":"i","উ":"u","ঊ":"u",
-    "ঋ":"ri","এ":"e","ঐ":"oi","ও":"o","ঔ":"ou"
-  };
-  const signs: Record<string, string> = {
-    "া":"a","ি":"i","ী":"i","ু":"u","ূ":"u","ৃ":"ri",
-    "ে":"e","ৈ":"oi","ো":"o","ৌ":"ou","্":""
-  };
-  const marks: Record<string, string> = {"ং":"ng","ঃ":"h","ঁ":"n"};
-  const chars = Array.from(title.normalize("NFC").trim().toLowerCase());
-  let output = "";
-  for (let i = 0; i < chars.length; i++) {
-    const ch = chars[i];
-    if (consonants[ch]) {
-      output += consonants[ch];
-      const next = chars[i + 1];
-      // Add Bengali's inherent "o" sound unless a vowel sign/virama follows.
-      if (!next || !(next in signs)) output += "o";
-    } else if (vowels[ch]) {
-      output += vowels[ch];
-    } else if (signs[ch] !== undefined) {
-      output += signs[ch];
-    } else if (marks[ch]) {
-      output += marks[ch];
-    } else if (/[a-z0-9]/.test(ch)) {
-      output += ch;
-    } else {
-      output += "-";
+async function createNewsSlug(title: string, uniqueId?: number): Promise<string> {
+  let englishTitle = title.trim();
+
+  // Free translation endpoint: Bengali headline -> English meaning.
+  try {
+    const response = await fetch(
+      `https://api.mymemory.translated.net/get?q=${encodeURIComponent(title.trim())}&langpair=bn|en`
+    );
+    if (response.ok) {
+      const data = await response.json();
+      const translated = data?.responseData?.translatedText;
+      if (typeof translated === "string" && translated.trim()) {
+        englishTitle = translated;
+      }
     }
+  } catch (error) {
+    console.error("Headline translation failed:", error);
   }
-  const base = output
+
+  const base = englishTitle
+    .normalize("NFKD")
+    .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "") || "news";
+
   return uniqueId !== undefined ? `${base}-${uniqueId}` : base;
 }
 
@@ -140,9 +122,12 @@ export default function AdminDashboard() {
   // =========================================================
 
   const [title, setTitle] = useState("");
+  const [customSlug, setCustomSlug] = useState("");
   const [category, setCategory] = useState(categories[0]);
   const [description, setDescription] = useState("");
   const descriptionEditorRef = useRef<HTMLDivElement>(null);
+  const inlineImageInputRef = useRef<HTMLInputElement>(null);
+  const savedEditorRangeRef = useRef<Range | null>(null);
   const [breaking, setBreaking] = useState(false);
   const [image, setImage] = useState<File | null>(null);
   const [youtubeUrl, setYoutubeUrl] = useState("");
@@ -404,6 +389,7 @@ export default function AdminDashboard() {
 
   const resetForm = () => {
     setTitle("");
+    setCustomSlug("");
     setCategory(categories[0]);
     setDescription("");
     if (descriptionEditorRef.current) descriptionEditorRef.current.innerHTML = "";
@@ -558,7 +544,9 @@ export default function AdminDashboard() {
             .from("news")
             .update({
               title: title.trim(),
-              slug: createNewsSlug(title, editingId!),
+              slug: customSlug.trim()
+                ? customSlug.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "")
+                : await createNewsSlug(title, editingId!),
               category,
               description:
                 description.trim(),
@@ -608,7 +596,9 @@ export default function AdminDashboard() {
             .insert([
               {
                 title: title.trim(),
-                slug: createNewsSlug(title, Date.now()),
+                slug: customSlug.trim()
+                  ? customSlug.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "")
+                  : await createNewsSlug(title, Date.now()),
                 category,
                 description:
                   description.trim(),
@@ -671,18 +661,12 @@ export default function AdminDashboard() {
     setEditingId(item.id);
 
     setTitle(item.title);
+    setCustomSlug(item.slug || "");
 
     setCategory(item.category);
 
-    setDescription(item.description);
-    if (descriptionEditorRef.current) {
-      const savedDescription = item.description || "";
-      if (/<\/?(p|br|strong|b|em|i|u|mark|h[1-6]|ul|ol|li|a)\b/i.test(savedDescription)) {
-        descriptionEditorRef.current.innerHTML = savedDescription;
-      } else {
-        descriptionEditorRef.current.textContent = savedDescription;
-      }
-    }
+    // Keep the saved HTML in state; the editor is hydrated after Add News is rendered.
+    setDescription(item.description || "");
 
     setBreaking(item.breaking);
 
@@ -1303,6 +1287,61 @@ export default function AdminDashboard() {
     }
   };
 
+
+  // Restore the description when Edit switches the dashboard to the news form.
+  useEffect(() => {
+    if (activeMenu !== "Add News" || editingId === null || !descriptionEditorRef.current) return;
+    const savedDescription = description || "";
+    if (/<\/?(p|br|strong|b|em|i|u|mark|h[1-6]|ul|ol|li|a|img)\b/i.test(savedDescription)) {
+      descriptionEditorRef.current.innerHTML = savedDescription;
+    } else {
+      descriptionEditorRef.current.textContent = savedDescription;
+    }
+  }, [activeMenu, editingId]);
+
+  const rememberEditorCursor = () => {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) savedEditorRangeRef.current = selection.getRangeAt(0).cloneRange();
+  };
+
+  const insertInlineImage = async (file?: File) => {
+    if (!file) return;
+    try {
+      const imageUrl = await uploadImage(file, "news-inline");
+      if (!imageUrl || !descriptionEditorRef.current) return;
+      const editor = descriptionEditorRef.current;
+      editor.focus();
+      const selection = window.getSelection();
+      if (selection && savedEditorRangeRef.current) {
+        selection.removeAllRanges();
+        selection.addRange(savedEditorRangeRef.current);
+      }
+      const img = document.createElement("img");
+      img.src = imageUrl;
+      img.alt = title.trim() || "News image";
+      img.style.maxWidth = "100%";
+      img.style.height = "auto";
+      img.style.display = "block";
+      img.style.margin = "16px auto";
+      const range = selection && selection.rangeCount ? selection.getRangeAt(0) : null;
+      if (range && editor.contains(range.commonAncestorContainer)) {
+        range.deleteContents();
+        range.insertNode(img);
+        range.setStartAfter(img);
+        range.collapse(true);
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+      } else {
+        editor.appendChild(img);
+      }
+      setDescription(editor.innerHTML);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? `Image upload হয়নি: ${error.message}` : "Image upload হয়নি।");
+    } finally {
+      if (inlineImageInputRef.current) inlineImageInputRef.current.value = "";
+    }
+  };
+
   const renderDashboard =
     () => {
       const totalNews =
@@ -1749,6 +1788,30 @@ export default function AdminDashboard() {
                 />
               </div>
 
+              {/* CUSTOM URL / SLUG */}
+              <div>
+                <label className="mb-2 block text-sm font-bold">
+                  Custom URL (optional)
+                </label>
+                <div className="mb-2 text-xs text-gray-500">
+                  https://therealitybangla.in/news/your-custom-url
+                </div>
+                <input
+                  type="text"
+                  value={customSlug}
+                  onChange={(e) =>
+                    setCustomSlug(
+                      e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "")
+                    )
+                  }
+                  placeholder="heavy-rain-in-kolkata"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-black"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  ফাঁকা রাখলে শিরোনাম থেকে URL তৈরি হবে। শুধু ইংরেজি অক্ষর, সংখ্যা ও hyphen ব্যবহার করুন।
+                </p>
+              </div>
+
               {/* CATEGORY */}
 
               <div>
@@ -1837,6 +1900,8 @@ export default function AdminDashboard() {
                     <button type="button" title="Bullet list" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextFormat("insertUnorderedList")} className="rounded border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-100">• List</button>
                     <button type="button" title="Numbered list" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextFormat("insertOrderedList")} className="rounded border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-100">1. List</button>
                     <button type="button" title="Add link" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextFormat("createLink")} className="rounded border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-100">Link</button>
+                    <button type="button" title="Insert image inside news text" onMouseDown={(event) => { rememberEditorCursor(); event.preventDefault(); }} onClick={() => inlineImageInputRef.current?.click()} className="rounded border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-100">+ Photo</button>
+                    <input ref={inlineImageInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(event) => void insertInlineImage(event.target.files?.[0])} />
                     <button type="button" title="Remove formatting" onMouseDown={(event) => event.preventDefault()} onClick={() => applyTextFormat("removeFormat")} className="rounded border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-100">Clear Format</button>
                   </div>
 
