@@ -289,15 +289,29 @@ export default async function Home({ searchParams }: PageProps) {
               🏠
             </Link>
 
-            {FIXED_CATEGORIES.map((category) => (
-              <a
-                key={category}
-                href={`#category-${encodeURIComponent(category)}`}
-                className="shrink-0 whitespace-nowrap transition hover:text-red-300"
-              >
-                {category}
-              </a>
-            ))}
+            
+{FIXED_CATEGORIES.map((category) => {
+  const categorySlugs: Record<string, string> = {
+    "দেশের কথা": "desher-kotha",
+    "বিশ্বের জানালা": "biswer-janala",
+    "বাংলার দিনলিপি": "banglar-dinlipi",
+    "মাঠের লড়াই": "mather-lorai",
+    "রুপোলি পর্দা": "rupoli-porda",
+    "শরীর-মন": "shorir-mon",
+    "ঘোরাঘুরি": "ghoraghuri",
+  };
+
+  return (
+    <Link
+      key={category}
+      href={`/category/${categorySlugs[category]}`}
+      className="shrink-0 whitespace-nowrap transition hover:text-red-300"
+    >
+      {category}
+    </Link>
+  );
+})}
+
 
             <Link
               href="/health-talk"

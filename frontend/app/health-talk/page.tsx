@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+
 type HealthTalkItem = {
   id: number;
   title: string;
@@ -10,21 +12,15 @@ type HealthTalkItem = {
   youtube_url: string | null;
 };
 
-type SiteSettings = {
-  site_name: string;
-  tagline: string;
-  logo_url: string | null;
+const CATEGORY_SLUGS: Record<string, string> = {
+  "দেশের কথা": "desher-kotha",
+  "বিশ্বের জানালা": "biswer-janala",
+  "বাংলার দিনলিপি": "banglar-dinlipi",
+  "মাঠের লড়াই": "mather-lorai",
+  "রুপোলি পর্দা": "rupoli-porda",
+  "শরীর-মন": "shorir-mon",
+  "ঘোরাঘুরি": "ghoraghuri",
 };
-
-const menuItems = [
-  "দেশের কথা",
-  "বিশ্বের জানালা",
-  "বাংলার দিনলিপি",
-  "মাঠের লড়াই",
-  "রুপোলি পর্দা",
-  "শরীর-মন",
-  "ঘোরাঘুরি",
-];
 
 function getYouTubeId(url: string | null) {
   if (!url) return "";
@@ -68,92 +64,187 @@ function formatDate(date: string) {
 }
 
 
-function toBengaliDigits(value: string | number) {
-  return String(value).replace(
-    /[0-9]/g,
-    (digit) => "০১২৩৪৫৬৭৮৯"[Number(digit)]
-  );
-}
+function formatHeaderDate(): string {
 
-function formatBanglaHeaderDate(date: Date) {
-  const weekdays = [
-    "রবিবার",
-    "সোমবার",
-    "মঙ্গলবার",
-    "বুধবার",
-    "বৃহস্পতিবার",
-    "শুক্রবার",
-    "শনিবার",
-  ];
+  const now = new Date();
+
+
+
+  const weekday = new Intl.DateTimeFormat("bn-IN", {
+
+    weekday: "long",
+
+    timeZone: "Asia/Kolkata",
+
+  }).format(now);
+
+
+
+  const parts = new Intl.DateTimeFormat("en-GB", {
+
+    day: "numeric",
+
+    month: "numeric",
+
+    year: "numeric",
+
+    timeZone: "Asia/Kolkata",
+
+  }).formatToParts(now);
+
+
+
+  const getPart = (type: string) =>
+
+    Number(parts.find((part) => part.type === type)?.value);
+
+
+
+  const day = getPart("day");
+
+  const month = getPart("month");
+
+  const year = getPart("year");
+
+
+
+  const bengaliDigits = (value: string | number) =>
+
+    String(value).replace(
+
+      /[0-9]/g,
+
+      (digit) => "০১২৩৪৫৬৭৮৯"[Number(digit)]
+
+    );
+
+
 
   const gregorianMonths = [
-    "জানুয়ারি",
-    "ফেব্রুয়ারি",
+
+    "জানুয়ারি",
+
+    "ফেব্রুয়ারি",
+
     "মার্চ",
+
     "এপ্রিল",
+
     "মে",
+
     "জুন",
+
     "জুলাই",
+
     "আগস্ট",
+
     "সেপ্টেম্বর",
+
     "অক্টোবর",
+
     "নভেম্বর",
+
     "ডিসেম্বর",
+
   ];
 
-  /*
-   * পশ্চিমবঙ্গের বাংলা পঞ্জিকা অনুযায়ী ২০২৬-২৭ সালের
-   * প্রয়োজনীয় বাংলা মাসের শুরুর তারিখ।
-   *
-   * ২৭ সেপ্টেম্বর ২০২৬ =
-   * ১০ আশ্বিন ১৪৩৩
-   */
-  const banglaMonthStarts = [
-    { start: new Date(2026, 3, 15), name: "বৈশাখ", year: 1433 },
-    { start: new Date(2026, 4, 15), name: "জ্যৈষ্ঠ", year: 1433 },
-    { start: new Date(2026, 5, 15), name: "আষাঢ়", year: 1433 },
-    { start: new Date(2026, 6, 16), name: "শ্রাবণ", year: 1433 },
-    { start: new Date(2026, 7, 17), name: "ভাদ্র", year: 1433 },
-    { start: new Date(2026, 8, 18), name: "আশ্বিন", year: 1433 },
-    { start: new Date(2026, 9, 18), name: "কার্তিক", year: 1433 },
-    { start: new Date(2026, 10, 17), name: "অগ্রহায়ণ", year: 1433 },
-    { start: new Date(2026, 11, 17), name: "পৌষ", year: 1433 },
 
-    { start: new Date(2027, 0, 16), name: "মাঘ", year: 1433 },
-    { start: new Date(2027, 1, 14), name: "ফাল্গুন", year: 1433 },
-    { start: new Date(2027, 2, 15), name: "চৈত্র", year: 1433 },
-    { start: new Date(2027, 3, 15), name: "বৈশাখ", year: 1434 },
+
+  const bengaliMonths = [
+
+    { name: "বৈশাখ", start: "2026-04-15", year: 1433 },
+
+    { name: "জ্যৈষ্ঠ", start: "2026-05-15", year: 1433 },
+
+    { name: "আষাঢ়", start: "2026-06-15", year: 1433 },
+
+    { name: "শ্রাবণ", start: "2026-07-16", year: 1433 },
+
+    { name: "ভাদ্র", start: "2026-08-17", year: 1433 },
+
+    { name: "আশ্বিন", start: "2026-09-18", year: 1433 },
+
+    { name: "কার্তিক", start: "2026-10-18", year: 1433 },
+
+    { name: "অগ্রহায়ণ", start: "2026-11-17", year: 1433 },
+
+    { name: "পৌষ", start: "2026-12-17", year: 1433 },
+
+    { name: "মাঘ", start: "2027-01-15", year: 1433 },
+
+    { name: "ফাল্গুন", start: "2027-02-14", year: 1433 },
+
+    { name: "চৈত্র", start: "2027-03-15", year: 1433 },
+
+    { name: "বৈশাখ", start: "2027-04-15", year: 1434 },
+
   ];
 
-  const current = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate()
-  );
 
-  let selectedMonth = banglaMonthStarts[0];
 
-  for (const item of banglaMonthStarts) {
-    if (current >= item.start) {
+  const currentKey = `${year}-${String(month).padStart(2, "0")}-${String(
+
+    day
+
+  ).padStart(2, "0")}`;
+
+
+
+  let selectedMonth = bengaliMonths[0];
+
+
+
+  for (const item of bengaliMonths) {
+
+    if (currentKey >= item.start) {
+
       selectedMonth = item;
+
     }
+
   }
 
+
+
+  const [startYear, startMonth, startDay] = selectedMonth.start
+
+    .split("-")
+
+    .map(Number);
+
+
+
+  const currentUTC = Date.UTC(year, month - 1, day);
+
+  const startUTC = Date.UTC(startYear, startMonth - 1, startDay);
+
+
+
   const diffDays = Math.floor(
-    (current.getTime() - selectedMonth.start.getTime()) /
-      (1000 * 60 * 60 * 24)
+
+    (currentUTC - startUTC) / (24 * 60 * 60 * 1000)
+
   );
 
-  const banglaDay = diffDays + 1;
 
-  return `${toBengaliDigits(banglaDay)} ${
+
+  const bengaliDay = diffDays + 1;
+
+
+
+  return `${weekday}, ${bengaliDigits(bengaliDay)} ${
+
     selectedMonth.name
-  } ${toBengaliDigits(selectedMonth.year)} • ${
-    weekdays[date.getDay()]
-  } • ${toBengaliDigits(date.getDate())} ${
-    gregorianMonths[date.getMonth()]
-  } ${toBengaliDigits(date.getFullYear())}`;
+
+  } ${bengaliDigits(selectedMonth.year)} | ${bengaliDigits(day)} ${
+
+    gregorianMonths[month - 1]
+
+  } ${bengaliDigits(year)}`;
+
 }
+
+
 
 export default async function HealthTalkPage({
   searchParams,
@@ -178,11 +269,10 @@ export default async function HealthTalkPage({
       .order("published_at", { ascending: false }),
   ]);
 
-  const site: SiteSettings = {
-    site_name: settings?.site_name ?? "বাংলার সংবাদ",
-    tagline: settings?.tagline ?? "সত্যের সঙ্গে, মানুষের পাশে",
-    logo_url: settings?.logo_url ?? null,
-  };
+  const siteName = settings?.site_name || "বাংলার সংবাদ";
+  const tagline = settings?.tagline || "সত্যের সঙ্গে, মানুষের পাশে";
+  const logoUrl = settings?.logo_url || null;
+  const formattedDate = formatHeaderDate();
 
   const allVideos = (healthTalk ?? []) as HealthTalkItem[];
 
@@ -194,89 +284,171 @@ export default async function HealthTalkPage({
 
   return (
     <main className="min-h-screen bg-white text-gray-900">
-      {/* Header */}
-      <header className="border-b-4 border-red-600 bg-white">
+      <header className="border-b-4 border-red-600 bg-white shadow-sm">
+
         <div className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-5">
 
-          {/* LOGO + SEARCH */}
           <div className="flex items-center justify-between gap-3">
 
-            {/* LOGO */}
             <Link href="/" className="shrink-0">
-              {site.logo_url ? (
+
+              {logoUrl ? (
+
                 <img
-                  src={site.logo_url}
-                  alt={site.site_name}
-                  className="h-16 w-auto max-w-[180px] object-contain sm:h-20 sm:max-w-[240px] md:h-24 md:max-w-[280px]"
+
+                  src={logoUrl}
+
+                  alt={siteName}
+
+                  className="h-16 w-auto max-w-[180px] object-contain sm:h-20 sm:max-w-[230px] md:h-24 md:max-w-[280px]"
+
                 />
+
               ) : (
+
                 <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-blue-900 text-xl font-extrabold text-white sm:h-20 sm:w-20">
+
                   বাং
+
                 </div>
+
               )}
+
             </Link>
 
-            {/* SEARCH */}
+
+
             <form
+
               action="/health-talk"
+
               method="GET"
+
               className="flex min-w-0 flex-1 justify-end gap-2"
+
             >
+
               <input
+
                 type="search"
+
                 name="q"
+
                 defaultValue={searchQuery}
-                placeholder="খুঁজুন..."
+
+                placeholder="খবর খুঁজুন..."
+
                 aria-label="হেলথ টক খুঁজুন"
+
                 className="min-w-0 w-full max-w-[420px] rounded-lg border-2 border-blue-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-blue-900 sm:px-4"
+
               />
 
+
+
               <button
+
                 type="submit"
+
                 className="shrink-0 rounded-lg bg-blue-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-600 sm:px-5"
+
               >
-                Search
+
+                খুঁজুন
+
               </button>
+
             </form>
+
           </div>
 
-          {/* DATE */}
-          <div className="mt-2 text-sm font-semibold text-blue-950 sm:text-base">
-            {formatBanglaHeaderDate(new Date())}
+
+
+          <div className="mt-2 text-[11px] font-semibold text-gray-600 sm:text-xs">
+
+            {formattedDate}
+
           </div>
 
         </div>
+
       </header>
 
-      {/* Fixed / sticky menu */}
-      <nav className="sticky top-0 z-50 border-b-4 border-red-600 bg-blue-900 text-white shadow-sm">
-        <div className="mx-auto flex max-w-7xl items-center gap-2 overflow-x-auto px-3 py-2 sm:gap-4 sm:px-4 lg:px-6">
-          <Link
-            href="/"
-            aria-label="Home"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xl transition hover:bg-blue-800"
-          >
-            🏠
-          </Link>
 
-          {menuItems.map((item) => (
+
+      {/* NAVIGATION MENU */}
+
+
+
+      <nav className="sticky top-0 z-50 bg-blue-900 shadow-lg">
+
+        <div className="mx-auto max-w-7xl">
+
+          <div className="flex gap-4 overflow-x-auto px-3 py-3 text-sm font-semibold text-white sm:gap-6 sm:px-4">
+
             <Link
-              key={item}
-              href={`/?category=${encodeURIComponent(item)}`}
-              className="shrink-0 rounded-lg px-3 py-2 text-sm font-semibold whitespace-nowrap transition hover:bg-blue-800"
-            >
-              {item}
-            </Link>
-          ))}
 
-          <Link
-            href="/health-talk"
-            className="shrink-0 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold whitespace-nowrap text-white"
-          >
-            হেলথ টক
-          </Link>
+              href="/"
+
+              aria-label="Home"
+
+              title="Home"
+
+              className="flex shrink-0 items-center text-lg transition hover:text-red-300"
+
+            >
+
+              🏠
+
+            </Link>
+
+
+
+            {Object.entries(CATEGORY_SLUGS).map(
+
+              ([name, categorySlug]) => (
+
+                <Link
+
+                  key={categorySlug}
+
+                  href={`/category/${categorySlug}`}
+
+                  className="shrink-0 whitespace-nowrap transition hover:text-red-300"
+
+                >
+
+                  {name}
+
+                </Link>
+
+              )
+
+            )}
+
+
+
+            <Link
+
+              href="/health-talk"
+
+              aria-current="page"
+
+              className="shrink-0 whitespace-nowrap font-bold text-red-300 transition hover:text-red-200"
+
+            >
+
+              Health Talk
+
+            </Link>
+
+          </div>
+
         </div>
+
       </nav>
+
+
 
       {/* Page content */}
       <section className="mx-auto max-w-7xl px-3 py-6 sm:px-4 sm:py-8 lg:px-6">
@@ -393,39 +565,54 @@ export default async function HealthTalkPage({
         )}
       </section>
 
-      <footer className="mt-12 bg-[#18295f] text-white">
-        <div className="mx-auto max-w-7xl px-6 py-8 sm:px-8 lg:px-10">
+      <footer className="mt-12 bg-blue-950 text-white">
 
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+        <div className="mx-auto max-w-7xl px-4 py-7">
 
-            {/* SITE INFO */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+
             <div>
-              <p className="text-xl font-medium text-white sm:text-2xl">
-                {site.site_name}
+
+              <p className="font-medium text-white">{siteName}</p>
+
+
+
+              <p className="mt-1 text-sm text-blue-200">
+
+                {tagline}
+
               </p>
 
-              <p className="mt-2 text-base text-white sm:text-lg">
-                {site.tagline}
-              </p>
             </div>
 
-            {/* ADMIN PANEL - NORMAL TEXT */}
+
+
             <Link
+
               href="/admin"
-              className="text-base text-white transition hover:text-blue-200 sm:text-lg"
+
+              className="text-sm text-blue-200 transition hover:text-white"
+
             >
+
               অ্যাডমিন প্যানেল
+
             </Link>
 
           </div>
 
-          {/* DIVIDER + COPYRIGHT */}
-          <div className="mt-8 border-t border-blue-400/40 pt-6 text-sm text-blue-200 sm:text-base">
-            © {new Date().getFullYear()} {site.site_name}. সর্বস্বত্ব সংরক্ষিত।
+
+
+          <div className="mt-5 border-t border-blue-800 pt-4 text-sm text-blue-300">
+
+            © 2026 {siteName}. সর্বস্বত্ব সংরক্ষিত।
+
           </div>
 
         </div>
+
       </footer>
+
     </main>
   );
 }
