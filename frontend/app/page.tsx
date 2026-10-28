@@ -32,6 +32,16 @@ const FIXED_CATEGORIES = [
   "ঘোরাঘুরি",
 ];
 
+const CATEGORY_SLUGS: Record<string, string> = {
+  "দেশের কথা": "desher-kotha",
+  "বিশ্বের জানালা": "biswer-janala",
+  "বাংলার দিনলিপি": "banglar-dinlipi",
+  "মাঠের লড়াই": "mather-lorai",
+  "রুপোলি পর্দা": "rupoli-porda",
+  "শরীর-মন": "shorir-mon",
+  "ঘোরাঘুরি": "ghoraghuri",
+};
+
 interface PageProps {
   searchParams: Promise<{ q?: string }>;
 }
@@ -44,11 +54,7 @@ export default async function Home({ searchParams }: PageProps) {
   // =========================================================
   // SITE SETTINGS
   // =========================================================
-
-  const {
-    data: settingsData,
-    error: settingsError,
-  } = await supabase
+  const { data: settingsData, error: settingsError } = await supabase
     .from("site_settings")
     .select("id, site_name, tagline, logo_url, updated_at")
     .eq("id", 1)
@@ -57,15 +63,9 @@ export default async function Home({ searchParams }: PageProps) {
   // =========================================================
   // NEWS
   // =========================================================
-
-  const {
-    data: newsData,
-    error: newsError,
-  } = await supabase
+  const { data: newsData, error: newsError } = await supabase
     .from("news")
-    .select(
-      "id, slug, title, description, category, image, published_at, breaking"
-    )
+    .select("id, slug, title, description, category, image, published_at, breaking")
     .neq("category", "Health Talk")
     .order("published_at", { ascending: false });
 
@@ -75,7 +75,6 @@ export default async function Home({ searchParams }: PageProps) {
   const news = searchQuery
     ? allNews.filter((item) => {
         const query = searchQuery.toLocaleLowerCase("bn-BD");
-
         return (
           item.title?.toLocaleLowerCase("bn-BD").includes(query) ||
           item.description?.toLocaleLowerCase("bn-BD").includes(query) ||
@@ -87,23 +86,15 @@ export default async function Home({ searchParams }: PageProps) {
   // =========================================================
   // SITE DATA
   // =========================================================
-
   const siteName = settings?.site_name || "বাংলার সংবাদ";
-
-  const tagline =
-    settings?.tagline || "সত্যের সঙ্গে, মানুষের পাশে";
-
+  const tagline = settings?.tagline || "সত্যের সঙ্গে, মানুষের পাশে";
   const logoUrl = settings?.logo_url || null;
 
   // =========================================================
-  // DATE (Compact & Clean)
+  // DATE & HELPERS
   // =========================================================
-
   function toBengaliDigits(value: string | number) {
-    return String(value).replace(
-      /[0-9]/g,
-      (digit) => "০১২৩৪৫৬৭৮৯"[Number(digit)]
-    );
+    return String(value).replace(/[0-9]/g, (digit) => "০১২৩৪৫৬৭৮৯"[Number(digit)]);
   }
 
   function formatBanglaHeaderDate(date: Date) {
@@ -118,18 +109,8 @@ export default async function Home({ searchParams }: PageProps) {
     ];
 
     const gregorianMonths = [
-      "জানুয়ারি",
-      "ফেব্রুয়ারি",
-      "মার্চ",
-      "এপ্রিল",
-      "মে",
-      "জুন",
-      "জুলাই",
-      "আগস্ট",
-      "সেপ্টেম্বর",
-      "অক্টোবর",
-      "নভেম্বর",
-      "ডিসেম্বর",
+      "জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন",
+      "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর"
     ];
 
     const bengaliMonths = [
@@ -144,12 +125,7 @@ export default async function Home({ searchParams }: PageProps) {
       { name: "পৌষ", start: new Date(2026, 11, 17), year: 1433 },
     ];
 
-    const current = new Date(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate()
-    );
-
+    const current = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     let selectedMonth = bengaliMonths[0];
 
     for (const month of bengaliMonths) {
@@ -159,8 +135,7 @@ export default async function Home({ searchParams }: PageProps) {
     }
 
     const diffDays = Math.floor(
-      (current.getTime() - selectedMonth.start.getTime()) /
-        (1000 * 60 * 60 * 24)
+      (current.getTime() - selectedMonth.start.getTime()) / (1000 * 60 * 60 * 24)
     );
 
     const bengaliDay = diffDays + 1;
@@ -171,63 +146,62 @@ export default async function Home({ searchParams }: PageProps) {
   const formattedDate = formatBanglaHeaderDate(new Date());
 
   // =========================================================
-  // MAIN NEWS
+  // MAIN NEWS & BREAKING
   // =========================================================
-
   const mainNews = news.length > 0 ? news[0] : null;
   const breakingNews =
-  [...news]
-    .filter((item) => item.breaking)
-    .sort(
-      (a, b) =>
-        new Date(b.published_at).getTime() -
-        new Date(a.published_at).getTime()
-    )[0] || null;
+    [...news]
+      .filter((item) => item.breaking)
+      .sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime())[0] || null;
 
   const latestNews = news.slice(0, 5);
 
   // =========================================================
-  // CATEGORY-WISE NEWS
+  // CATEGORY-WISE NEWS (Unicode Normalized Pass)
   // =========================================================
-
   const categoryMap: Record<string, NewsItem[]> = {};
-
   FIXED_CATEGORIES.forEach((category) => {
     categoryMap[category] = [];
   });
 
-  news.forEach((item) => {
-    const category = item.category?.trim();
+  const normalizeCategory = (value: string) => 
+    value.trim().replace(/\s+/g, " ").normalize("NFC");
 
-    if (category && FIXED_CATEGORIES.includes(category)) {
-      categoryMap[category].push(item);
+ 
+news.forEach((item) => {
+  const itemCategory = normalizeCategory(item.category || "");
+
+  const matchedCategory = FIXED_CATEGORIES.find(
+    (cat) => normalizeCategory(cat) === itemCategory
+  );
+
+  if (matchedCategory) {
+    const alreadyExists = categoryMap[matchedCategory].some(
+      (existingItem) => existingItem.id === item.id
+    );
+
+    if (!alreadyExists) {
+      categoryMap[matchedCategory].push(item);
+    } else {
+      console.warn(
+        "Duplicate news ID found:",
+        item.id,
+        item.title
+      );
     }
-  });
+  }
+});
 
-  // =========================================================
-  // ERROR MESSAGES
-  // =========================================================
 
-  const newsErrorMessage = newsError
-    ? newsError.message || "News database থেকে data load করা যাচ্ছে না।"
-    : null;
-
-  const settingsErrorMessage = settingsError
-    ? settingsError.message || "Site settings load করা যাচ্ছে না।"
-    : null;
+  const newsErrorMessage = newsError ? newsError.message || "News database থেকে data load করা যাচ্ছে না।" : null;
+  const settingsErrorMessage = settingsError ? settingsError.message || "Site settings load করা যাচ্ছে না।" : null;
 
   return (
     <main className="min-h-screen bg-white text-gray-900">
-
-      {/* =====================================================
-          HEADER
-      ====================================================== */}
+      {/* HEADER */}
       <header className="border-b-4 border-red-600 bg-white shadow-sm">
         <div className="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-5">
-
           <div className="flex items-center justify-between gap-3">
-
-            {/* LOGO */}
             <Link href="/" className="shrink-0">
               {logoUrl ? (
                 <img
@@ -242,12 +216,7 @@ export default async function Home({ searchParams }: PageProps) {
               )}
             </Link>
 
-            {/* SEARCH */}
-            <form
-              action="/"
-              method="GET"
-              className="flex min-w-0 flex-1 justify-end gap-2"
-            >
+            <form action="/" method="GET" className="flex min-w-0 flex-1 justify-end gap-2">
               <input
                 type="search"
                 name="q"
@@ -256,7 +225,6 @@ export default async function Home({ searchParams }: PageProps) {
                 aria-label="খবর খুঁজুন"
                 className="min-w-0 w-full max-w-[420px] rounded-lg border-2 border-blue-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-blue-900 sm:px-4"
               />
-
               <button
                 type="submit"
                 className="shrink-0 rounded-lg bg-blue-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-600 sm:px-5"
@@ -264,19 +232,15 @@ export default async function Home({ searchParams }: PageProps) {
                 খুঁজুন
               </button>
             </form>
-
           </div>
 
           <div className="mt-2 text-[11px] font-semibold text-gray-600 sm:text-xs">
             {formattedDate}
           </div>
-
         </div>
       </header>
 
-      {/* =====================================================
-          STICKY MENU BAR
-      ====================================================== */}
+      {/* STICKY MENU BAR */}
       <nav className="sticky top-0 z-50 bg-blue-900 shadow-lg">
         <div className="mx-auto max-w-7xl">
           <div className="flex gap-4 overflow-x-auto px-3 py-3 text-sm font-semibold text-white sm:gap-6 sm:px-4">
@@ -289,29 +253,15 @@ export default async function Home({ searchParams }: PageProps) {
               🏠
             </Link>
 
-            
-{FIXED_CATEGORIES.map((category) => {
-  const categorySlugs: Record<string, string> = {
-    "দেশের কথা": "desher-kotha",
-    "বিশ্বের জানালা": "biswer-janala",
-    "বাংলার দিনলিপি": "banglar-dinlipi",
-    "মাঠের লড়াই": "mather-lorai",
-    "রুপোলি পর্দা": "rupoli-porda",
-    "শরীর-মন": "shorir-mon",
-    "ঘোরাঘুরি": "ghoraghuri",
-  };
-
-  return (
-    <Link
-      key={category}
-      href={`/category/${categorySlugs[category]}`}
-      className="shrink-0 whitespace-nowrap transition hover:text-red-300"
-    >
-      {category}
-    </Link>
-  );
-})}
-
+            {FIXED_CATEGORIES.map((category) => (
+              <Link
+                key={category}
+                href={`/category/${CATEGORY_SLUGS[category]}`}
+                className="shrink-0 whitespace-nowrap transition hover:text-red-300"
+              >
+                {category}
+              </Link>
+            ))}
 
             <Link
               href="/health-talk"
@@ -323,9 +273,7 @@ export default async function Home({ searchParams }: PageProps) {
         </div>
       </nav>
 
-      {/* =====================================================
-          SETTINGS ERROR
-      ====================================================== */}
+      {/* ERRORS */}
       {settingsErrorMessage && (
         <div className="mx-auto max-w-7xl px-4 pt-5">
           <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-yellow-800">
@@ -335,9 +283,6 @@ export default async function Home({ searchParams }: PageProps) {
         </div>
       )}
 
-      {/* =====================================================
-          NEWS ERROR
-      ====================================================== */}
       {newsErrorMessage && (
         <div className="mx-auto max-w-7xl px-4 pt-5">
           <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-700">
@@ -347,9 +292,7 @@ export default async function Home({ searchParams }: PageProps) {
         </div>
       )}
 
-      {/* =====================================================
-          BREAKING NEWS
-      ====================================================== */}
+      {/* BREAKING NEWS */}
       {breakingNews && (
         <section className="border-b border-red-800 bg-red-600 text-white">
           <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
@@ -366,18 +309,13 @@ export default async function Home({ searchParams }: PageProps) {
         </section>
       )}
 
-      {/* =====================================================
-          MAIN CONTENT
-      ====================================================== */}
+      {/* MAIN CONTENT */}
       <div className="mx-auto max-w-7xl px-4 py-8">
-
         {searchQuery && (
           <section className="mb-8 rounded-xl border border-blue-100 bg-blue-50 p-5">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-xl font-extrabold text-blue-950">
-                  Search Results
-                </h2>
+                <h2 className="text-xl font-extrabold text-blue-950">Search Results</h2>
                 <p className="mt-1 text-sm text-gray-600">
                   “{searchQuery}” এর জন্য {news.length}টি খবর পাওয়া গেছে।
                 </p>
@@ -399,9 +337,7 @@ export default async function Home({ searchParams }: PageProps) {
               <h2 className="text-2xl font-extrabold text-blue-900 md:text-3xl">
                 কোনও Search Result পাওয়া যায়নি
               </h2>
-              <p className="mt-3 text-gray-600">
-                “{searchQuery}” নামে কোনও News পাওয়া যায়নি।
-              </p>
+              <p className="mt-3 text-gray-600">“{searchQuery}” নামে কোনও News পাওয়া যায়নি।</p>
               <Link
                 href="/"
                 className="mt-6 inline-block rounded-lg bg-blue-900 px-6 py-3 font-semibold text-white transition hover:bg-red-600"
@@ -417,9 +353,7 @@ export default async function Home({ searchParams }: PageProps) {
               <h2 className="text-2xl font-extrabold text-blue-900 md:text-3xl">
                 এখনও কোনও News প্রকাশিত হয়নি
               </h2>
-              <p className="mt-3 text-gray-600">
-                Admin Panel থেকে প্রথম News Publish করুন।
-              </p>
+              <p className="mt-3 text-gray-600">Admin Panel থেকে প্রথম News Publish করুন।</p>
               <Link
                 href="/admin"
                 className="mt-6 inline-block rounded-lg bg-blue-900 px-6 py-3 font-semibold text-white transition hover:bg-red-600"
@@ -430,19 +364,12 @@ export default async function Home({ searchParams }: PageProps) {
           </div>
         ) : (
           <>
-            {/* =================================================
-                MAIN NEWS + LATEST NEWS
-            ================================================== */}
+            {/* MAIN NEWS + LATEST NEWS */}
             <div className="grid gap-8 lg:grid-cols-3">
-
-              {/* MAIN NEWS (Order: Title -> Image -> Text) */}
               <section className="lg:col-span-2">
                 {mainNews && (
                   <article className="overflow-hidden rounded-xl border border-blue-100 bg-white p-6 shadow-sm">
-                    
-                    {/* 1. TITLE */}
                     <div>
-                      
                       <Link href={`/news/${mainNews.slug || mainNews.id}`}>
                         <h2 className="mt-2 text-2xl font-extrabold leading-tight text-blue-950 transition hover:text-red-600 md:text-3xl">
                           {mainNews.title}
@@ -450,7 +377,6 @@ export default async function Home({ searchParams }: PageProps) {
                       </Link>
                     </div>
 
-                    {/* 2. IMAGE */}
                     <div className="my-5 overflow-hidden rounded-lg">
                       <Link href={`/news/${mainNews.slug || mainNews.id}`} className="block overflow-hidden">
                         <img
@@ -461,43 +387,35 @@ export default async function Home({ searchParams }: PageProps) {
                       </Link>
                     </div>
 
-                    {/* 3. TEXT (Description & Read More) */}
                     <div>
-                     
-<div
-  className="line-clamp-3 text-gray-600 leading-relaxed"
-  dangerouslySetInnerHTML={{
-    __html: (mainNews.description || "")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/&amp;/g, "&")
-      .replace(/\r\n/g, "\n")
-      .replace(/\n/g, "<br />"),
-  }}
-/>
-
-
+                      <div
+                        className="line-clamp-3 text-gray-600 leading-relaxed"
+                        dangerouslySetInnerHTML={{
+                          __html: (mainNews.description || "")
+                            .replace(/&lt;/g, "<")
+                            .replace(/&gt;/g, ">")
+                            .replace(/&quot;/g, '"')
+                            .replace(/&#39;/g, "'")
+                            .replace(/&amp;/g, "&")
+                            .replace(/\r\n/g, "\n")
+                            .replace(/\n/g, "<br />"),
+                        }}
+                      />
                       <p className="mt-4 text-sm font-bold text-red-600">
                         <Link href={`/news/${mainNews.slug || mainNews.id}`} className="hover:underline">
                           বিস্তারিত পড়ুন →
                         </Link>
                       </p>
                     </div>
-
                   </article>
                 )}
               </section>
 
-              {/* =================================================
-                  LATEST NEWS
-              ================================================== */}
+              {/* LATEST NEWS */}
               <aside>
                 <h2 className="mb-4 border-b-4 border-red-600 pb-3 text-xl font-extrabold text-blue-950">
                   সর্বশেষ খবর
                 </h2>
-
                 <div className="space-y-4">
                   {latestNews.map((item) => (
                     <Link
@@ -507,16 +425,11 @@ export default async function Home({ searchParams }: PageProps) {
                     >
                       <article className="border-b border-gray-200 pb-4">
                         <span className="text-xs font-semibold text-red-600">
-                          {new Date(
-                            item.published_at
-                          ).toLocaleDateString(
-                            "bn-BD",
-                            {
-                              day: "numeric",
-                              month: "long",
-                              year: "numeric",
-                            }
-                          )}
+                          {new Date(item.published_at).toLocaleDateString("bn-BD", {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          })}
                         </span>
                         <h3 className="mt-1 font-bold text-blue-950 transition hover:text-red-600">
                           {item.title}
@@ -526,16 +439,12 @@ export default async function Home({ searchParams }: PageProps) {
                   ))}
                 </div>
               </aside>
-
             </div>
 
-            {/* =================================================
-                FIXED CATEGORY SECTIONS
-            ================================================== */}
+            {/* FIXED CATEGORY SECTIONS */}
             <div className="mt-12 space-y-14">
               {FIXED_CATEGORIES.map((category) => {
-                const categoryNews =
-                  categoryMap[category].slice(0, 6);
+                const categoryNews = categoryMap[category]?.slice(0, 6) || [];
 
                 if (categoryNews.length === 0) {
                   return null;
@@ -557,16 +466,13 @@ export default async function Home({ searchParams }: PageProps) {
                     <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
                       {categoryNews.map((item) => (
                         <article
-                          key={item.id}
+                          key={`${category}-${item.id}`}
                           className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:border-blue-300 hover:shadow-lg flex flex-col justify-between"
                         >
                           <div>
                             <Link href={`/news/${item.slug || item.id}`} className="block overflow-hidden">
                               <img
-                                src={
-                                  item.image ||
-                                  "/news-placeholder.jpg"
-                                }
+                                src={item.image || "/news-placeholder.jpg"}
                                 alt={item.title}
                                 className="h-44 w-full object-cover transition duration-300 hover:scale-105"
                               />
@@ -583,39 +489,29 @@ export default async function Home({ searchParams }: PageProps) {
                                 </h3>
                               </Link>
 
-                              
-
-<div className="mt-2 line-clamp-2 text-sm text-gray-600">
-  {item.description
-    ?.replace(/<[^>]*>/g, " ")
-    .replace(/&lt;|&gt;|&quot;|&#39;|&amp;/g, (entity) => {
-      const entities: Record<string, string> = {
-        "&lt;": "<",
-        "&gt;": ">",
-        "&quot;": '"',
-        "&#39;": "'",
-        "&amp;": "&",
-      };
-      return entities[entity] || entity;
-    })
-    .replace(/<[^>]*>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()}
-</div>
-
-
+                              <div className="mt-2 line-clamp-2 text-sm text-gray-600">
+                                {item.description
+                                  ?.replace(/<[^>]*>/g, " ")
+                                  .replace(/&lt;|&gt;|&quot;|&#39;|&amp;/g, (entity) => {
+                                    const entities: Record<string, string> = {
+                                      "&lt;": "<",
+                                      "&gt;": ">",
+                                      "&quot;": '"',
+                                      "&#39;": "'",
+                                      "&amp;": "&",
+                                    };
+                                    return entities[entity] || entity;
+                                  })
+                                  .replace(/\s+/g, " ")
+                                  .trim()}
+                              </div>
 
                               <p className="mt-3 text-xs text-gray-500">
-                                {new Date(
-                                  item.published_at
-                                ).toLocaleDateString(
-                                  "bn-BD",
-                                  {
-                                    day: "numeric",
-                                    month: "long",
-                                    year: "numeric",
-                                  }
-                                )}
+                                {new Date(item.published_at).toLocaleDateString("bn-BD", {
+                                  day: "numeric",
+                                  month: "long",
+                                  year: "numeric",
+                                })}
                               </p>
                             </div>
                           </div>
@@ -637,12 +533,9 @@ export default async function Home({ searchParams }: PageProps) {
             </div>
           </>
         )}
-
       </div>
 
-      {/* =====================================================
-          FOOTER
-      ====================================================== */}
+      {/* FOOTER */}
       <footer className="mt-12 bg-blue-950 text-white">
         <div className="mx-auto max-w-7xl px-4 py-7">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -650,11 +543,7 @@ export default async function Home({ searchParams }: PageProps) {
               <p className="font-medium text-white">{siteName}</p>
               <p className="mt-1 text-sm text-blue-200">{tagline}</p>
             </div>
-
-            <Link
-              href="/admin"
-              className="text-sm text-blue-200 transition hover:text-white"
-            >
+            <Link href="/admin" className="text-sm text-blue-200 transition hover:text-white">
               অ্যাডমিন প্যানেল
             </Link>
           </div>
@@ -664,7 +553,6 @@ export default async function Home({ searchParams }: PageProps) {
           </div>
         </div>
       </footer>
-
     </main>
   );
 }
